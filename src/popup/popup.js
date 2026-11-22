@@ -20,6 +20,7 @@
   var els = {
     enabled: document.getElementById('enabled'),
     hideNative: document.getElementById('hideNative'),
+    keepChrome: document.getElementById('keepChrome'),
     panels: document.getElementById('panels'),
     refreshMinutes: document.getElementById('refreshMinutes'),
     listLimit: document.getElementById('listLimit'),
@@ -48,6 +49,7 @@
   function render(settings) {
     els.enabled.checked = !!settings.enabled;
     els.hideNative.checked = !!settings.hideNative;
+    els.keepChrome.checked = !!settings.keepChrome;
     els.refreshMinutes.value = String(settings.refreshMinutes);
     els.listLimit.value = String(settings.listLimit);
     els.repoCount.value = String(settings.repoCount);
@@ -79,6 +81,10 @@
 
   els.hideNative.addEventListener('change', function () {
     save({ hideNative: els.hideNative.checked });
+  });
+
+  els.keepChrome.addEventListener('change', function () {
+    save({ keepChrome: els.keepChrome.checked });
   });
 
   els.refreshMinutes.addEventListener('change', function () {

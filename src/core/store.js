@@ -20,6 +20,8 @@ GHW.store = (function () {
     enabled: true,
     // 关掉 GitHub 原生首页（For you 流 + 右侧栏），换成我们的工作台
     hideNative: true,
+    // 只替换中间那一列 feed，保留页面的 Home 标题 / 搜索框 / 切换条
+    keepChrome: true,
     // 缓存有效期（分钟）
     refreshMinutes: 10,
     // 每个列表最多显示多少条

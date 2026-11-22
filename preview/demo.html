@@ -1,39 +1,164 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="ghw-surgical">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>GitHub Workbench · 效果预览</title>
     <link rel="stylesheet" href="../src/content/styles.css" />
     <style>
-      /* 只是给预览页撑个 GitHub 风格的背景，扩展里不需要这段 */
+      /* 这里只是把 GitHub 的外壳简陋地模拟一下，好看清「顶栏保留 + feed 被替换」的效果。
+         扩展本身不需要这些样式。 */
       html,
       body {
         margin: 0;
-        background: #ffffff;
-        color: #1f2328;
-      }
-      body {
+        background: var(--bgColor-default, #ffffff);
+        color: var(--fgColor-default, #1f2328);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
       }
+
       .demo-bar {
-        padding: 10px 24px;
-        border-bottom: 1px solid #d1d9e0;
-        font-size: 12px;
-        color: #59636e;
-        background: #f6f8fa;
+        padding: 8px 24px;
+        border-bottom: 1px dashed var(--borderColor-default, #d1d9e0);
+        font-size: 11px;
+        color: var(--fgColor-muted, #59636e);
       }
-      @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          background: #0d1117;
-          color: #e6edf3;
-        }
-        .demo-bar {
-          background: #151b23;
-          border-color: #3d444d;
-          color: #9198a1;
-        }
+
+      /* 全局导航：扩展不碰它 */
+      .gh-nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 56px;
+        padding: 0 24px;
+        background: var(--bgColor-muted, #f6f8fa);
+        border-bottom: 1px solid var(--borderColor-default, #d1d9e0);
+      }
+      .gh-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #1f2328;
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .gh-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 300px;
+        height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--borderColor-default, #d1d9e0);
+        border-radius: 6px;
+        background: var(--bgColor-default, #fff);
+        font-size: 12px;
+        color: var(--fgColor-muted, #59636e);
+      }
+      .gh-search kbd {
+        margin-left: auto;
+        padding: 0 4px;
+        border: 1px solid var(--borderColor-default, #d1d9e0);
+        border-radius: 3px;
+        font: inherit;
+        font-size: 10px;
+      }
+      .gh-nav-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .gh-ico {
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid var(--fgColor-muted, #59636e);
+        border-radius: 4px;
+        opacity: 0.6;
+      }
+      .gh-me {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--borderColor-default, #d1d9e0);
+      }
+
+      /* 页面顶部：Home 标题 + 搜索 + 切换条，扩展也不碰 */
+      .gh-main {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 24px 24px 48px;
+      }
+      .gh-page-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 8px;
+      }
+      .gh-page-top h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 600;
+      }
+      .gh-feed-search {
+        width: 280px;
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid var(--borderColor-default, #d1d9e0);
+        border-radius: 6px;
+        background: var(--bgColor-muted, #f6f8fa);
+        font-size: 12px;
+        color: var(--fgColor-muted, #59636e);
+      }
+      .gh-tabs {
+        display: flex;
+        gap: 18px;
+        border-bottom: 1px solid var(--borderColor-default, #d1d9e0);
+        font-size: 13px;
+        color: var(--fgColor-muted, #59636e);
+      }
+      .gh-tab {
+        padding: 7px 0 9px;
+      }
+      .gh-tab.is-on {
+        color: var(--fgColor-default, #1f2328);
+        font-weight: 600;
+        border-bottom: 2px solid #fd8c73;
+      }
+      .gh-tab.is-right {
+        margin-left: auto;
+        color: var(--fgColor-accent, #0969da);
+      }
+
+      .gh-cols {
+        display: flex;
+        gap: 24px;
+        margin-top: 16px;
+      }
+      .gh-col-main {
+        flex: 1;
+        min-width: 0;
+      }
+      .feed-right-sidebar {
+        width: 300px;
+        flex: none;
+        font-size: 12px;
+        color: var(--fgColor-muted, #59636e);
+      }
+
+      /* 假的原生 feed，正常情况下会被扩展的 .ghw-surgical 规则藏掉 */
+      .gh-feedcard,
+      .gh-sidecard {
+        padding: 14px;
+        margin-bottom: 10px;
+        border: 1px solid var(--borderColor-default, #d1d9e0);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--fgColor-muted, #59636e);
       }
 
       /* 预览页里没有 GitHub 自己的样式表，这里补一套包含暗色的变量垫片，
@@ -51,16 +176,57 @@
         --fgColor-done: #ab7df8;
         --fgColor-danger: #f85149;
       }
-      html[data-color-mode='dark'],
-      html[data-color-mode='dark'] body {
-        background: #0d1117;
-        color: #e6edf3;
+      html[data-color-mode='dark'] .gh-mark {
+        background: #e6edf3;
+        color: #0d1117;
       }
     </style>
   </head>
   <body>
-    <div class="demo-bar">效果预览 · 数据是假的，只用来检查排版</div>
-    <div id="mount" class="ghw-root"></div>
+    <div class="demo-bar">效果预览 · 数据是假的，只用来检查排版（加 <code>?dark</code> 看暗色）</div>
+
+    <!-- GitHub 全局导航：扩展完全不动它 -->
+    <header class="gh-nav">
+      <div class="gh-mark">GH</div>
+      <div class="gh-search">Type <kbd>/</kbd> to search…</div>
+      <div class="gh-nav-right">
+        <span class="gh-ico"></span>
+        <span class="gh-ico" style="border-radius: 50%"></span>
+        <span class="gh-me"></span>
+      </div>
+    </header>
+
+    <main class="gh-main">
+      <!-- 页面顶部：这一条现在会保留下来 -->
+      <div class="gh-page-top">
+        <h1>Home</h1>
+        <div class="gh-feed-search">Search the feed…</div>
+      </div>
+      <div class="gh-tabs">
+        <span class="gh-tab is-on">For you</span>
+        <span class="gh-tab">Following</span>
+        <span class="gh-tab is-right">Filter ⌄</span>
+      </div>
+
+      <div class="gh-cols">
+        <div class="gh-col-main">
+          <!-- 工作台插在 feed 原来的位置 -->
+          <div id="ghw-root" class="ghw-root"></div>
+
+          <!-- 原生 feed：被 .ghw-surgical 规则隐藏掉 -->
+          <feed-container>
+            <div class="gh-feedcard">Someone starred a repo · 原生 feed 卡 1</div>
+            <div class="gh-feedcard">A release was published · 原生 feed 卡 2</div>
+          </feed-container>
+        </div>
+
+        <!-- 原生的右侧栏：一起隐藏 -->
+        <aside class="feed-right-sidebar">
+          <div class="gh-sidecard">Latest changes · 原生右栏</div>
+          <div class="gh-sidecard">Explore repositories · 原生右栏</div>
+        </aside>
+      </div>
+    </main>
 
     <script src="../src/core/util.js"></script>
     <script src="../src/content/ui.js"></script>
@@ -152,7 +318,7 @@
           onRetry: function () {},
           onToggleNative: function () {}
         });
-        document.getElementById('mount').appendChild(app.el);
+        document.getElementById('ghw-root').appendChild(app.el);
 
         app.apply('profile', {
           data: {
@@ -209,5 +375,6 @@
     </script>
   </body>
 </html>
+
 
 

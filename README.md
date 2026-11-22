@@ -18,6 +18,14 @@
 - **跟着主题走**。所有颜色都用 GitHub 自己的 CSS 变量，浅色 / 暗色 / 第三方主题自动适配。
 - **可逆**。顶部右侧有「显示 GitHub 原生首页」按钮，随时切回去，不用卸载扩展。
 
+## 接管方式
+
+默认只替换中间那一列 feed：全局导航、`Home` 标题、页面里的搜索框、`For you / Following` 切换条全部保留，工作台直接顶替 feed 的位置，右侧的原生栏一起收起来。
+
+实现上就是找 `feed-container` / `.feed-right-sidebar` 藏掉，把工作台插在 feed 原来的位置（`src/content/index.js` 的 `resolveMount`）。找不到 feed 结构时自动退回「整页接管」，不会出现半截页面。
+
+两者可以在扩展弹窗里切：「保留页面顶部」关掉就是整页接管。
+
 ## 面板
 
 | 面板 | 数据来源 |
@@ -48,6 +56,7 @@ Chrome / Edge：
 点扩展图标：
 
 - 总开关、是否接管首页
+- 只替换 feed（保留页面顶部）还是整页接管
 - 每个面板单独开关
 - 缓存有效期（2 分钟 ~ 1 小时）、列表条数
 - 清缓存
@@ -57,8 +66,9 @@ Chrome / Edge：
 ```
 github.com 首页加载
    │
-   ├─ index.js   判断路由（只接管 / 和 /dashboard），挂载 #ghw-root
-   │             并给 <html> 加 ghw-native-hidden，把原生的 main 隐藏掉
+   ├─ index.js   判断路由（只接管 / 和 /dashboard），决定挂载位置：
+   │             找到 feed-container 就替换它（保留页面顶部），
+   │             找不到就整页接管（给 <html> 加 ghw-native-hidden 藏掉 main）
    │
    ├─ api.js     同源 fetch 上面那几个页面（带 cookie），带 TTL 缓存
    │             某个源失败不影响其它面板，失败时优先用旧缓存

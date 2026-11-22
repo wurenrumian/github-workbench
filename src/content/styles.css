@@ -70,6 +70,22 @@ html.ghw-native-hidden .application-main > :not(#ghw-root) {
   display: none !important;
 }
 
+/* 只接管 feed：页面顶部的 Home 标题、搜索框、For you/Following 切换条都保留 */
+html.ghw-surgical main feed-container,
+html.ghw-surgical main .feed-right-sidebar,
+html.ghw-surgical main [data-active-topic],
+html.ghw-surgical main [class*='feed-container'],
+html.ghw-surgical main .js-feed-container {
+  display: none !important;
+}
+
+/* 这种模式下工作台是 feed 的兄弟节点，宽度由页面容器决定，别再自己居中 */
+html.ghw-surgical #ghw-root {
+  max-width: none;
+  margin: 0;
+  padding: 8px 0 32px;
+}
+
 html.ghw-native-hidden body .footer,
 html.ghw-native-hidden body footer {
   display: none !important;

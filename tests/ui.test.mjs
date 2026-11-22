@@ -44,6 +44,7 @@ const GHW = window.GHW;
 const settings = {
   enabled: true,
   hideNative: true,
+  keepChrome: true,
   refreshMinutes: 10,
   listLimit: 8,
   repoCount: 4,
@@ -186,3 +187,4 @@ if (failures) {
   process.exit(1);
 }
 console.log('✓ 全部通过\n');
+

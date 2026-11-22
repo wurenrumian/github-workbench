@@ -23,6 +23,7 @@
     settings: null,
     app: null,
     root: null,
+    mode: null,
     mounted: false,
     seq: 0
   };
@@ -103,14 +104,39 @@
 
   /* --------------------------------------------------------- 挂载 / 卸载 */
 
+  function findFeed() {
+    var main = document.querySelector('main');
+    if (!main) return null;
+    var feed = main.querySelector(
+      'feed-container, [data-active-topic], [class*="feed-container"], .js-feed-container'
+    );
+    return feed && feed.parentElement ? feed : null;
+  }
+
+  /**
+   * 决定把工作台挂到哪：
+   *  - surgical：找到 feed 容器，替换它，页面顶部原样保留
+   *  - full：找不到 feed（或用户关掉了 keepChrome），整页接管
+   */
+  function resolveMount() {
+    var feed = findFeed();
+    if (state.settings.keepChrome && feed) {
+      return { mode: 'surgical', before: feed, host: feed.parentElement };
+    }
+
+    var host = hostEl();
+    if (!host) return null;
+    return { mode: 'full', before: host.querySelector('main') || host.firstChild, host: host };
+  }
+
   function mount() {
     if (state.mounted || !isHome()) return;
 
     var login = API.getLogin();
     if (!login) return; // 没登录就不接管首页
 
-    var host = hostEl();
-    if (!host) return;
+    var plan = resolveMount();
+    if (!plan) return;
 
     var root = h('div', { id: ROOT_ID, class: 'ghw-root' });
 
@@ -134,15 +160,16 @@
     });
 
     root.appendChild(app.el);
-    host.insertBefore(root, host.querySelector('main') || host.firstChild);
+    plan.host.insertBefore(root, plan.before);
 
     state.root = root;
     state.app = app;
+    state.mode = plan.mode;
     state.mounted = true;
 
     // Turbo 换页后会换掉 .application-main，观察器要跟着换到新节点上
     observer.disconnect();
-    observer.observe(host, { childList: true });
+    observer.observe(plan.host, { childList: true });
 
     applyNativeVisibility();
     loadAll({ force: false });
@@ -152,15 +179,18 @@
     // 关掉 hideNative 时不是卸载，而是把原生内容露出来放到工作台下面 ——
     // 这样那个开关永远是双向可逆的，不用再去点扩展图标。
     var hide = !!state.settings.hideNative;
-    document.documentElement.classList.toggle('ghw-native-hidden', hide);
+    document.documentElement.classList.toggle('ghw-surgical', hide && state.mode === 'surgical');
+    document.documentElement.classList.toggle('ghw-native-hidden', hide && state.mode !== 'surgical');
     if (state.app) state.app.setNativeVisible(!hide);
   }
 
   function unmount() {
     if (state.root && state.root.parentNode) state.root.parentNode.removeChild(state.root);
     document.documentElement.classList.remove('ghw-native-hidden');
+    document.documentElement.classList.remove('ghw-surgical');
     state.root = null;
     state.app = null;
+    state.mode = null;
     state.mounted = false;
   }
 
@@ -191,6 +221,13 @@
           state.root = null;
         }
         if (state.mounted) {
+          // 首屏时 feed 可能还没渲染出来，导致我们先走了整页接管。
+          // 一旦 feed 出现，就切回「只替换 feed」，把顶部栏还回去。
+          if (state.mode === 'full' && settings.keepChrome && findFeed()) {
+            unmount();
+            mount();
+            return;
+          }
           applyNativeVisibility();
           return;
         }
@@ -228,10 +265,9 @@
       ensure();
       return;
     }
-    if (state.mounted && state.settings.hideNative) {
-      if (!document.documentElement.classList.contains('ghw-native-hidden')) {
-        document.documentElement.classList.add('ghw-native-hidden');
-      }
+    if (state.mounted) {
+      // GitHub 可能把原生内容又塞回来，或者把我们的类名抹掉，这里重新对齐一次
+      applyNativeVisibility();
     }
   });
 
@@ -247,7 +283,10 @@
       STORE.getSettings().then(function (s) {
         var needRemount =
           state.settings &&
-          JSON.stringify(state.settings.panels) !== JSON.stringify(s.panels);
+          (JSON.stringify(state.settings.panels) !== JSON.stringify(s.panels) ||
+            state.settings.keepChrome !== s.keepChrome ||
+            Number(state.settings.listLimit) !== Number(s.listLimit) ||
+            Number(state.settings.repoCount) !== Number(s.repoCount));
         state.settings = s;
         if (!s.enabled) {
           unmount();
