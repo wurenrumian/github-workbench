@@ -103,7 +103,15 @@ console.log('\n[身份信息 / 置顶]');
 {
   app.apply('profile', {
     data: {
-      meta: { name: 'The Octocat', bio: 'hi', followers: '16k', following: '9', location: 'Hangzhou' },
+      meta: {
+        name: 'The Octocat',
+        bio: 'hi',
+        followers: '16k',
+        following: '9',
+        location: 'Hangzhou',
+        avatar: 'https://avatars.githubusercontent.com/u/583231?v=4',
+        achievements: 3
+      },
       pinned: [
         { fullName: 'octocat/Hello-World', href: '/octocat/Hello-World', description: 'demo', language: 'Ruby', languageColor: '#701516', stars: '2k' }
       ]
@@ -113,6 +121,21 @@ console.log('\n[身份信息 / 置顶]');
   check('bio 显示出来', () => assert(!document.querySelector('.ghw-bio').classList.contains('is-hidden'), 'bio 还藏着'));
   check('粉丝数进了 chip', () => assert(document.querySelector('.ghw-chips').textContent.includes('16k'), '没有粉丝数'));
   check('地点进了 chip', () => assert(document.querySelector('.ghw-chips').textContent.includes('Hangzhou'), '没有地点'));
+  check('头像 / 昵称都指向个人主页', () => {
+    assert(document.querySelector('.ghw-avatar-link').getAttribute('href') === 'https://github.com/octocat', 'avatar href');
+    assert(document.querySelector('.ghw-name-link').getAttribute('href') === 'https://github.com/octocat', 'name href');
+    assert(
+      document.querySelector('.ghw-avatar').getAttribute('src') === 'https://avatars.githubusercontent.com/u/583231?v=4',
+      'avatar src'
+    );
+  });
+  check('关注者 / 正在关注 / 成就都是链接', () => {
+    const chips = [...document.querySelectorAll('.ghw-chips a.ghw-chip-link')].map((a) => a.getAttribute('href'));
+    assert(chips.some((h) => /tab=followers$/.test(h)), chips.join(','));
+    assert(chips.some((h) => /tab=following$/.test(h)), chips.join(','));
+    assert(chips.some((h) => /tab=achievements$/.test(h)), chips.join(','));
+    assert(document.querySelector('.ghw-chips').textContent.includes('3 项成就'), '没有成就数');
+  });
   check('置顶仓库渲染成卡片', () => assert(q('[data-panel="pinned"] .ghw-repo').length === 1, '置顶卡片数量不对'));
 }
 
@@ -294,6 +317,45 @@ console.log('\n[关注的项目 · 手动添加]');
   });
 }
 
+console.log('\n[关注的项目 · 拖拽排序]');
+{
+  const s = JSON.parse(JSON.stringify(settings));
+  s.starredPicks = ['d/a', 'd/b', 'd/c'];
+  const saved = [];
+  const dragApp = GHW.ui.create({
+    login: 'octocat',
+    settings: s,
+    onRefresh: () => {},
+    onRetry: () => {},
+    onSavePicks: (picks) => saved.push(picks)
+  });
+  document.body.appendChild(dragApp.el);
+  dragApp.apply('starred', {
+    data: [
+      { fullName: 'd/a', href: '/d/a', description: '', language: 'Go', languageColor: null, stars: '1', updated: null, visibility: '' },
+      { fullName: 'd/b', href: '/d/b', description: '', language: 'Go', languageColor: null, stars: '1', updated: null, visibility: '' },
+      { fullName: 'd/c', href: '/d/c', description: '', language: 'Go', languageColor: null, stars: '1', updated: null, visibility: '' }
+    ]
+  });
+
+  const cards = [...dragApp.el.querySelectorAll('[data-panel="starred"] .ghw-repo')];
+  check('卡片可拖动且带仓库名', () => {
+    assert(cards.length === 3, `实际 ${cards.length} 张`);
+    assert(cards.every((c) => c.draggable), 'draggable 没打开');
+    assert(cards.every((c) => c.getAttribute('data-repo')), '缺少 data-repo');
+  });
+  check('拖到末尾后顺序被保存', () => {
+    const grid = cards[0].parentElement;
+    cards[0].dispatchEvent(new window.Event('dragstart', { bubbles: true }));
+    grid.insertBefore(cards[0], cards[2].nextSibling);
+    cards[0].dispatchEvent(new window.Event('dragend', { bubbles: true }));
+    assert(saved.length === 1, '没有触发 onSavePicks');
+    assert(saved[0].join(',') === 'd/b,d/c,d/a', `保存的顺序是 ${saved[0].join(',')}`);
+    assert(s.starredPicks.join(',') === 'd/b,d/c,d/a', `settings 里是 ${s.starredPicks.join(',')}`);
+  });
+  dragApp.el.remove();
+}
+
 console.log('\n[面板顺序]');
 {
   const s2 = JSON.parse(JSON.stringify(settings));
@@ -355,10 +417,16 @@ console.log('\n[错误与安全]');
 
 console.log('\n[刷新]');
 {
-  document.querySelector('.ghw-hero-btns .ghw-btn').click();
+  const refresh = [...document.querySelectorAll('.ghw-hero-btns .ghw-btn')].find((b) => /刷新/.test(b.textContent));
+  refresh.click();
   check('刷新按钮触发回调', () => assert(calls.includes('refresh'), '回调没触发'));
-  check('hero 里只剩刷新按钮（没有「显示原生首页」这种中间态）', () =>
-    assert(document.querySelectorAll('.ghw-hero-btns .ghw-btn').length === 1, '按钮数量不对'));
+  check('hero 动作区有编辑资料 / 新仓库 / 复制链接 / 刷新', () =>
+    assert(document.querySelectorAll('.ghw-hero-btns .ghw-btn').length === 4, '按钮数量不对'));
+  check('编辑资料 / 新仓库指向原生页面', () => {
+    const hrefs = [...document.querySelectorAll('.ghw-hero-btns a.ghw-btn')].map((a) => a.getAttribute('href'));
+    assert(hrefs.includes('https://github.com/settings/profile'), hrefs.join(','));
+    assert(hrefs.includes('https://github.com/new'), hrefs.join(','));
+  });
 }
 
 console.log('');

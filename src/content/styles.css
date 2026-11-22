@@ -213,6 +213,38 @@ html.ghw-native-hidden body footer {
 .ghw-hero-btns {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ghw-hero-btns a.ghw-btn {
+  text-decoration: none;
+}
+
+.ghw-btn.is-ok {
+  color: var(--ghw-success);
+  border-color: var(--ghw-success);
+}
+
+.ghw-avatar-link {
+  flex: none;
+  display: block;
+  line-height: 0;
+  border-radius: 50%;
+}
+
+.ghw-avatar-link:hover .ghw-avatar {
+  box-shadow: 0 0 0 4px var(--ghw-bg), 0 0 0 5px var(--ghw-accent);
+}
+
+.ghw-name-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ghw-name-link:hover {
+  color: var(--ghw-accent);
+  text-decoration: none;
 }
 
 /* ------------------------------------------------------------------ 按钮 */
@@ -945,6 +977,16 @@ html.ghw-native-hidden body footer {
 
 .ghw-repo-stat .ghw-ico {
   color: var(--ghw-muted);
+}
+
+/* 关注的项目卡片可拖动排序 */
+.ghw-repo.is-draggable {
+  cursor: grab;
+}
+
+.ghw-repo.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
 }
 
 /* ------------------------------------------------------------- 贡献日历 */

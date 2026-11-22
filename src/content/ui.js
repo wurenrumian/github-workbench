@@ -40,7 +40,9 @@ GHW.ui = (function () {
     stars: '/stars',
     explore: '/explore',
     feed: '/dashboard-feed',
-    settings: '/settings'
+    settings: '/settings',
+    editProfile: '/settings/profile',
+    newRepo: '/new'
   };
 
   function abs(path) {
@@ -261,7 +263,7 @@ GHW.ui = (function () {
 
     return h(
       'a',
-      { class: 'ghw-repo', href: abs(r.href), title: r.description || r.fullName },
+      { class: 'ghw-repo', href: abs(r.href), title: r.description || r.fullName, dataset: { repo: r.fullName } },
       h(
         'div',
         { class: 'ghw-repo-head' },
@@ -354,13 +356,19 @@ GHW.ui = (function () {
     var bodyEls = {};
     var sections = {};
 
-    var heroAvatar = h('img', {
+    var heroAvatarImg = h('img', {
       class: 'ghw-avatar',
       src: 'https://github.com/' + encodeURIComponent(login) + '.png?size=160',
       alt: '',
       loading: 'lazy'
     });
-    var heroName = h('h1', { class: 'ghw-name', text: login });
+    var heroAvatar = h(
+      'a',
+      { class: 'ghw-avatar-link', href: abs('/' + login), title: '打开 GitHub 个人主页' },
+      heroAvatarImg
+    );
+    var heroNameLink = h('a', { class: 'ghw-name-link', href: abs('/' + login), text: login });
+    var heroName = h('h1', { class: 'ghw-name' }, heroNameLink);
     var heroLogin = h('span', { class: 'ghw-login', text: '@' + login });
     var heroBio = h('p', { class: 'ghw-bio is-hidden' });
     var heroChips = h('div', { class: 'ghw-chips' });
@@ -371,6 +379,70 @@ GHW.ui = (function () {
       h('span', { class: 'ghw-btn-ico', text: '⟳' }),
       h('span', { text: '刷新' })
     );
+
+    var editProfileBtn = h(
+      'a',
+      { class: 'ghw-btn', href: abs(LINKS.editProfile), title: '编辑资料、头像、简介' },
+      GHW.icons.make('pencil', 'ghw-ico-sm'),
+      h('span', { text: '编辑资料' })
+    );
+
+    var newRepoBtn = h(
+      'a',
+      { class: 'ghw-btn', href: abs(LINKS.newRepo), title: '新建仓库' },
+      GHW.icons.make('plus', 'ghw-ico-sm'),
+      h('span', { text: '新仓库' })
+    );
+
+    var copyLabel = h('span', { text: '复制链接' });
+    var copyBtn = h(
+      'button',
+      {
+        class: 'ghw-btn',
+        type: 'button',
+        title: '复制个人主页地址',
+        onclick: function () {
+          var url = 'https://github.com/' + encodeURIComponent(login);
+          function report(ok) {
+            copyLabel.textContent = ok ? '已复制' : '复制失败';
+            copyBtn.classList.toggle('is-ok', !!ok);
+            setTimeout(function () {
+              copyLabel.textContent = '复制链接';
+              copyBtn.classList.remove('is-ok');
+            }, 1600);
+          }
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(
+              function () { report(true); },
+              function () { report(fallbackCopy(url)); }
+            );
+          } else {
+            report(fallbackCopy(url));
+          }
+        }
+      },
+      GHW.icons.make('link', 'ghw-ico-sm'),
+      copyLabel
+    );
+
+    /** 剪贴板 API 不可用（或没有权限）时的兜底 */
+    function fallbackCopy(text) {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = false;
+      try {
+        ok = document.execCommand('copy');
+      } catch (err) {
+        ok = false;
+      }
+      document.body.removeChild(ta);
+      return ok;
+    }
 
     var quickLinks = h(
       'nav',
@@ -626,6 +698,75 @@ GHW.ui = (function () {
         return;
       }
       renderRepos(body, items);
+      wireStarDrag(body);
+    }
+
+    /* 关注的项目：卡片可拖动排序，顺序存进 settings.starredPicks */
+    function wireStarDrag(body) {
+      var grid = body.querySelector('.ghw-repo-grid');
+      if (!grid) return;
+      var dragged = null;
+
+      function cards() {
+        return Array.prototype.slice.call(grid.querySelectorAll('.ghw-repo'));
+      }
+
+      function finish() {
+        if (!dragged) return;
+        dragged.classList.remove('is-dragging');
+        dragged = null;
+        var order = cards()
+          .map(function (c) {
+            return c.getAttribute('data-repo');
+          })
+          .filter(Boolean);
+        if (!order.length) return;
+        settings.starredPicks = order;
+        if (ctx.onSavePicks) ctx.onSavePicks(order);
+      }
+
+      cards().forEach(function (card) {
+        card.draggable = true;
+        card.classList.add('is-draggable');
+
+        card.addEventListener('dragstart', function (e) {
+          e.stopPropagation();
+          dragged = card;
+          card.classList.add('is-dragging');
+          if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            try {
+              e.dataTransfer.setData('text/plain', card.getAttribute('data-repo') || '');
+            } catch (err) {
+              /* 某些浏览器对 setData 有自己的脾气，失败不影响排序 */
+            }
+          }
+        });
+
+        card.addEventListener('dragend', function (e) {
+          e.stopPropagation();
+          finish();
+        });
+      });
+
+      grid.addEventListener('dragover', function (e) {
+        if (!dragged) return;
+        e.stopPropagation();
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+        var target = e.target.closest ? e.target.closest('.ghw-repo') : null;
+        if (!target || target === dragged) return;
+        var box = target.getBoundingClientRect();
+        // 一行两个卡片时，按指针在目标卡片左半/右半决定插到前面还是后面
+        var after = e.clientX > box.left + box.width / 2;
+        grid.insertBefore(dragged, after ? target.nextSibling : target);
+      });
+
+      grid.addEventListener('drop', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+        finish();
+      });
     }
     var starEditAction = settings.panels.starred ? starredEditBtn : null;
 
@@ -836,6 +977,9 @@ GHW.ui = (function () {
           });
 
           panel.addEventListener('dragend', function () {
+            // 面板里还有别的可拖元素（比如关注的项目卡片），
+            // 它们的 dragend 也会冒泡到这里，不能顺手把布局存一遍
+            if (dragEl !== panel) return;
             panel.draggable = false;
             panel.classList.remove('is-dragging');
             dragEl = null;
@@ -881,7 +1025,7 @@ GHW.ui = (function () {
         'header',
         { class: 'ghw-hero' },
         h('div', { class: 'ghw-hero-id' }, heroAvatar, h('div', { class: 'ghw-hero-text' }, heroName, h('div', { class: 'ghw-hero-sub' }, heroLogin, heroChips), heroBio)),
-        h('div', { class: 'ghw-hero-actions' }, metaLine, h('div', { class: 'ghw-hero-btns' }, refreshBtn))
+        h('div', { class: 'ghw-hero-actions' }, metaLine, h('div', { class: 'ghw-hero-btns' }, editProfileBtn, newRepoBtn, copyBtn, refreshBtn))
       ),
       quickLinks,
       h('div', { class: 'ghw-grid' }, mainCol, sideCol),
@@ -937,14 +1081,40 @@ GHW.ui = (function () {
         // profile 没有独立面板，它喂的是顶部身份区和「置顶」面板
         if (name === 'profile') {
           var meta = (data && data.meta) || {};
-          if (meta.name) heroName.textContent = meta.name;
+          if (meta.name) heroNameLink.textContent = meta.name;
+          if (meta.avatar) heroAvatarImg.src = meta.avatar;
           if (meta.bio) {
             heroBio.textContent = meta.bio;
             heroBio.classList.remove('is-hidden');
           }
           heroChips.textContent = '';
-          if (meta.followers) heroChips.appendChild(h('span', { class: 'ghw-chip', text: meta.followers + ' followers' }));
-          if (meta.following) heroChips.appendChild(h('span', { class: 'ghw-chip', text: meta.following + ' following' }));
+          if (meta.followers) {
+            heroChips.appendChild(
+              h('a', {
+                class: 'ghw-chip ghw-chip-link',
+                href: abs('/' + login + '?tab=followers'),
+                text: meta.followers + ' 关注者'
+              })
+            );
+          }
+          if (meta.following) {
+            heroChips.appendChild(
+              h('a', {
+                class: 'ghw-chip ghw-chip-link',
+                href: abs('/' + login + '?tab=following'),
+                text: meta.following + ' 正在关注'
+              })
+            );
+          }
+          if (meta.achievements) {
+            heroChips.appendChild(
+              h('a', {
+                class: 'ghw-chip ghw-chip-link',
+                href: abs('/' + login + '?tab=achievements'),
+                text: meta.achievements + ' 项成就'
+              })
+            );
+          }
           if (meta.location) heroChips.appendChild(h('span', { class: 'ghw-chip', text: meta.location }));
           if (meta.company) heroChips.appendChild(h('span', { class: 'ghw-chip', text: '@' + meta.company }));
           if (meta.website) {

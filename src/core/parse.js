@@ -324,10 +324,22 @@ GHW.parse = (function () {
     var bio = doc.querySelector('.p-note div, .p-note, [data-bio-text]');
     if (bio) out.bio = U.textOf(bio);
 
+    var avatar = doc.querySelector('img.avatar-user, [itemprop="image"]');
+    if (avatar) out.avatar = avatar.getAttribute('src') || '';
+
     var followers = doc.querySelector('a[href$="?tab=followers"] .Counter, a[href$="?tab=followers"] .text-bold');
-    if (followers) out.followers = U.textOf(followers);
+    if (followers) out.followers = countAlone(followers);
     var following = doc.querySelector('a[href$="?tab=following"] .Counter, a[href$="?tab=following"] .text-bold');
-    if (following) out.following = U.textOf(following);
+    if (following) out.following = countAlone(following);
+
+    // 成就：个人主页的那排徽章，按 achievement=xxx 去重
+    var seenAch = {};
+    var achLinks = doc.querySelectorAll('a[href*="achievement="]');
+    for (var a = 0; a < achLinks.length; a++) {
+      var m = /achievement=([^&]+)/.exec(achLinks[a].getAttribute('href') || '');
+      if (m) seenAch[m[1]] = 1;
+    }
+    out.achievements = Object.keys(seenAch).length;
 
     var location = doc.querySelector('li[itemprop="homeLocation"], [itemprop="homeLocation"]');
     if (location) out.location = U.textOf(location).replace(/^[^\w\u4e00-\u9fa5]+\s*/, '');
@@ -337,6 +349,12 @@ GHW.parse = (function () {
     if (site) out.website = site.getAttribute('href') || U.textOf(site);
 
     return out;
+  }
+
+  /** 「4 followers」这种文本里只留数字 */
+  function countAlone(node) {
+    var t = U.textOf(node).replace(/followers|following/gi, '').trim();
+    return t.replace(/[^\d.,km]/gi, '');
   }
 
   /** 置顶仓库（profile 页的 Pinned 区块） */
