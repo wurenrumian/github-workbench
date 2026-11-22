@@ -172,22 +172,76 @@ GHW.api = (function () {
     return task;
   }
 
-  /** 单个仓库的元信息（手动添加的关注项目用），单独缓存 1 小时 */
-  function repoMeta(fullName) {
+  /**
+   * 单个仓库的元信息（手动添加的关注项目、补 topics 用），单独缓存 1 小时。
+   *
+   * 2026-11 版仓库页不再 SSR 语言，所以：
+   *   - 仓库页：描述 / topics / star / fork
+   *   - 搜索结果页：语言、颜色、更新时间（已知语言时省掉这次请求）
+   */
+  function repoMeta(fullName, known) {
     var key = 'repo:' + fullName;
     return STORE.cacheGet(key, 60).then(function (hit) {
-      if (hit) return hit.data;
-      return fetchHtml('/' + fullName).then(function (doc) {
-        var meta = P.parseRepoHeader(doc);
-        meta.fullName = fullName;
-        meta.owner = fullName.split('/')[0];
-        meta.name = fullName.split('/')[1];
-        meta.href = '/' + fullName;
-        meta.updated = null;
-        meta.visibility = '';
-        STORE.cacheSet(key, meta);
-        return meta;
-      });
+      if (hit && !hit.stale && hit.data) return hit.data;
+      return fetchMeta(fullName, known).then(
+        function (meta) {
+          if (meta) {
+            STORE.cacheSet(key, meta);
+            return meta;
+          }
+          if (hit && hit.data) return hit.data;
+          throw new Error('没解析出 ' + fullName + ' 的仓库信息');
+        },
+        function (err) {
+          if (hit && hit.data) return hit.data;
+          throw err;
+        }
+      );
+    });
+  }
+
+  function fetchMeta(fullName, known) {
+    var jobs = [
+      fetchHtml('/' + fullName).then(function (doc) {
+        return P.parseRepoHeader(doc);
+      })
+    ];
+
+    var needSearch = !known || !known.language || !known.languageColor;
+    if (needSearch) {
+      jobs.push(
+        fetchHtml(searchUrl('repo%3A' + encodeURIComponent(fullName), 'repositories')).then(function (doc) {
+          return P.parseRepoSearch(doc, fullName);
+        })
+      );
+    }
+
+    return Promise.all(
+      jobs.map(function (job) {
+        return job.catch(function () {
+          return null;
+        });
+      })
+    ).then(function (parts) {
+      var head = parts[0] || {};
+      var search = parts[1] || {};
+      var meta = {
+        fullName: fullName,
+        owner: fullName.split('/')[0],
+        name: fullName.split('/')[1],
+        href: '/' + fullName,
+        description: head.description || search.description || '',
+        language: (known && known.language) || search.language || '',
+        languageColor: (known && known.languageColor) || search.languageColor || null,
+        stars: head.stars || search.stars || '',
+        forks: head.forks || search.forks || '',
+        topics: head.topics && head.topics.length ? head.topics : search.topics || [],
+        starredAt: (known && known.starredAt) || null,
+        updated: search.updated || null,
+        visibility: (known && known.visibility) || ''
+      };
+      if (!meta.description && !meta.stars && !meta.forks && !meta.topics.length && !meta.updated) return null;
+      return meta;
     });
   }
 

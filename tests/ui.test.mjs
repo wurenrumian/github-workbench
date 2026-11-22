@@ -263,7 +263,35 @@ console.log('\n[关注的项目 · 手动添加]');
     assert(document.querySelectorAll('[data-panel="starred"] .ghw-pick').length === before, '非法输入被加进去了');
     assert(input.classList.contains('is-bad'), '没有错误态');
   });
-  document.querySelector('[data-panel="starred"] .ghw-picker-foot .ghw-btn').click();
+  document.querySelector('[data-panel="starred"] .ghw-picker-foot .is-primary').click();
+
+  check('手动添加的仓库即使没拉到元信息也显示出来', () => {
+    const cards = [...document.querySelectorAll('[data-panel="starred"] .ghw-repo')];
+    const bar = cards.find((c) => c.textContent.includes('foo/bar'));
+    assert(!!bar, cards.map((c) => c.textContent).join(' | '));
+    assert(/正在读取/.test(bar.textContent), bar.textContent);
+  });
+  check('mergeStarredMeta 补上元信息和 topics', () => {
+    app.mergeStarredMeta({
+      fullName: 'foo/bar',
+      owner: 'foo',
+      name: 'bar',
+      href: '/foo/bar',
+      description: '示例仓库',
+      language: 'Rust',
+      languageColor: '#dea584',
+      stars: '8',
+      forks: '2',
+      topics: ['cli', 'rust'],
+      starredAt: null,
+      updated: null,
+      visibility: ''
+    });
+    const bar = [...document.querySelectorAll('[data-panel="starred"] .ghw-repo')].find((c) => c.textContent.includes('foo/bar'));
+    assert(/示例仓库/.test(bar.textContent), bar.textContent);
+    assert(bar.querySelectorAll('.ghw-topic').length === 2, 'topic 数量不对');
+    assert(bar.querySelectorAll('.ghw-repo-stat').length === 2, 'stat 数量不对');
+  });
 }
 
 console.log('\n[面板顺序]');

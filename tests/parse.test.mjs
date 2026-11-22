@@ -158,6 +158,56 @@ console.log('\n[未读角标]');
   check('从顶栏读出未读数', () => assertEqual(n, 12, 'count'));
 }
 
+console.log('\n[单个仓库页]');
+{
+  const window = bootstrap(`<!doctype html><html><body>
+    <p class="SidebarAbout-module_eqNI3a_description prc-Text-Text-9mHv3">把 GitHub 首页换成工作台</p>
+    <a class="prc-TopicTag-TopicTag-LS-jX" href="/topics/chrome-extension">chrome-extension</a>
+    <a class="prc-TopicTag-TopicTag-LS-jX" href="/topics/github">github</a>
+    <a href="/wurenrumian/github-workbench/stargazers">0 stars</a>
+    <a href="/wurenrumian/github-workbench/forks">0 forks</a>
+    <script>var p = {stargazerCount:78033,watcherCount:1296,forksCount:14998};</script>
+  </body></html>`);
+  const doc = new window.DOMParser().parseFromString(window.document.documentElement.outerHTML, 'text/html');
+  const meta = window.GHW.parse.parseRepoHeader(doc);
+
+  check('读到描述', () => assertEqual(meta.description, '把 GitHub 首页换成工作台', 'description'));
+  check('star / fork 来自内联 props', () => {
+    assertEqual(meta.stars, '78k', 'stars');
+    assertEqual(meta.forks, '15k', 'forks');
+  });
+  check('读到 topics', () => assertEqual(meta.topics.join(','), 'chrome-extension,github', 'topics'));
+}
+
+console.log('\n[仓库搜索结果]');
+{
+  const window = bootstrap(`<!doctype html><html><body>
+    <div class="Result__Of4h7n"><div class="resultRow__BjR5Xh">
+      <h3 class="header__ZqTG4W"><div class="search-title"><a href="/wurenrumian/github-workbench">wurenrumian/github-workbench</a></div></h3>
+      <div class="Content__agXLbn">把 GitHub 首页换成工作台</div>
+      <div class="tokenList__w65Lup"><a href="/topics/github">github</a></div>
+      <ul class="footer__evnOBN">
+        <li><span aria-label="JavaScript language">JavaScript</span>
+            <div class="languageCircle__eF82_7" style="background-color:#f1e05a"></div></li>
+        <li><a href="/wurenrumian/github-workbench/stargazers"><span>13,149</span></a></li>
+        <li><span>Updated <div title="Nov 22, 2026, 8:57 AM UTC"><span title="Nov 22, 2026, 8:57 AM UTC">7 minutes ago</span></div></span></li>
+      </ul>
+    </div></div>
+  </body></html>`);
+  const doc = new window.DOMParser().parseFromString(window.document.documentElement.outerHTML, 'text/html');
+  const meta = window.GHW.parse.parseRepoSearch(doc, 'wurenrumian/github-workbench');
+
+  check('读到语言和颜色', () => {
+    assertEqual(meta.language, 'JavaScript', 'language');
+    assertEqual(meta.languageColor, '#f1e05a', 'languageColor');
+  });
+  check('star 数格式化成短格式', () => assertEqual(meta.stars, '13.1k', 'stars'));
+  check('读到更新时间', () => assertEqual(meta.updated, '2026-11-22T08:57:00.000Z', 'updated'));
+  check('读到 topics', () => assertEqual(meta.topics.join(','), 'github', 'topics'));
+  check('仓库名对不上时返回空', () =>
+    assertEqual(window.GHW.parse.parseRepoSearch(doc, 'someone/else').description, '', 'description'));
+}
+
 console.log('\n[空输入不崩]');
 {
   const window = bootstrap();

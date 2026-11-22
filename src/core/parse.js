@@ -371,6 +371,37 @@ GHW.parse = (function () {
   }
 
   /**
+   * 星标 / fork 数统一成 GitHub 那种短格式。
+   * "13,149" → "13.1k"，"1.2k" → "1.2k"，"78k" → "78k"。
+   */
+  function countText(node) {
+    if (!node) return '';
+    var raw = U.textOf(node).replace(/[^\d.,km]/gi, '');
+    var m = /^([\d.,]+)([km]?)$/i.exec(raw);
+    if (!m) return '';
+    var n = parseFloat(m[1].replace(/,/g, ''));
+    if (isNaN(n)) return '';
+    if (/k/i.test(m[2])) n *= 1000;
+    if (/m/i.test(m[2])) n *= 1000000;
+    return U.fmtNum(Math.round(n));
+  }
+
+  /** 页面上所有 topic 链接（去重，最多 limit 个） */
+  function topicsOf(scope, limit) {
+    var out = [];
+    var seen = {};
+    if (!scope) return out;
+    var links = scope.querySelectorAll('a[href^="/topics/"]');
+    for (var i = 0; i < links.length && out.length < (limit || 6); i++) {
+      var name = U.textOf(links[i]);
+      if (!name || seen[name]) continue;
+      seen[name] = 1;
+      out.push(name);
+    }
+    return out;
+  }
+
+  /**
    * 仓库列表（/<login>?tab=repositories&sort=updated）。
    * 主选择器是 itemprop，比 class 稳；拿不到就退回 _name 链接的启发式。
    */
@@ -402,8 +433,9 @@ GHW.parse = (function () {
         description: desc ? U.textOf(desc) : '',
         language: lang ? U.textOf(lang) : '',
         languageColor: U.colorFromStyle(colorEl && colorEl.getAttribute('style')),
-        stars: stars ? U.textOf(stars).replace(/[^\d.,km]/gi, '') : '',
-        forks: forks ? U.textOf(forks).replace(/[^\d.,km]/gi, '') : '',
+        stars: countText(stars),
+        forks: countText(forks),
+        topics: topicsOf(li),
         starredAt: null,
         updated: timeEl ? timeEl.getAttribute('datetime') : null,
         visibility: vis ? U.textOf(vis) : ''
@@ -417,7 +449,7 @@ GHW.parse = (function () {
         var h = links[j].getAttribute('href') || '';
         if (!/^\/[^\/]+\/[^\/]+$/.test(h)) continue;
         var p = h.replace(/^\//, '').split('/');
-        out.push({ fullName: p[0] + '/' + p[1], owner: p[0], name: p[1], href: h, description: '', language: '', languageColor: null, stars: '', updated: null, visibility: '' });
+        out.push({ fullName: p[0] + '/' + p[1], owner: p[0], name: p[1], href: h, description: '', language: '', languageColor: null, stars: '', forks: '', topics: [], updated: null, visibility: '' });
       }
     }
 
@@ -497,8 +529,9 @@ GHW.parse = (function () {
         description: desc ? U.textOf(desc) : '',
         language: lang ? U.textOf(lang) : '',
         languageColor: U.colorFromStyle(colorEl && colorEl.getAttribute('style')),
-        stars: stars ? U.textOf(stars).replace(/[^\d.,km]/gi, '') : '',
-        forks: forks ? U.textOf(forks).replace(/[^\d.,km]/gi, '') : '',
+        stars: countText(stars),
+        forks: countText(forks),
+        topics: topicsOf(li),
         // /stars 里的时间戳是「收藏时间」，不是仓库更新时间
         starredAt: timeEl ? timeEl.getAttribute('datetime') : null,
         updated: null,
@@ -517,21 +550,98 @@ GHW.parse = (function () {
     return limit ? out.slice(0, limit) : out;
   }
 
-  /** 单个仓库页的头部信息，用于手动添加的关注项目 */
+  /**
+   * 单个仓库页的头部信息，用于「关注的项目」里手动添加的仓库。
+   *
+   * 2026-11 版仓库页和 issue 列表一样退化成 React 壳了，SSR 里只剩：
+   *   - 描述 / topics：About 侧栏（SidebarAbout-module_*_description）
+   *   - star / fork 数：页面脚本里的 props（stargazerCount:78033）
+   * 语言（Languages 区块）是骨架屏，得靠 parseRepoSearch 从搜索结果页补。
+   */
   function parseRepoHeader(doc) {
-    var out = { description: '', language: '', languageColor: null, stars: '' };
+    var out = {
+      description: '',
+      language: '',
+      languageColor: null,
+      stars: '',
+      forks: '',
+      topics: [],
+      updated: null
+    };
 
-    var desc = doc.querySelector('[itemprop="description"], .BorderGrid-cell p, p.f4.my-3');
+    var desc = doc.querySelector(
+      '[class*="SidebarAbout"][class*="description"], [itemprop="description"], .BorderGrid-cell p, p.f4.my-3'
+    );
     if (desc) out.description = U.textOf(desc);
 
-    var lang = doc.querySelector('[itemprop="programmingLanguage"]');
+    out.topics = topicsOf(doc);
+
+    // 计数在 SSR 的内联 props 里；DOM 里有时只有按钮上的数字
+    var scripts = Array.prototype.map
+      .call(doc.querySelectorAll('script'), function (s) {
+        return s.textContent;
+      })
+      .join('\n');
+    var st = /stargazerCount:(\d+)/.exec(scripts);
+    if (st) out.stars = U.fmtNum(parseInt(st[1], 10));
+    var fk = /forksCount:(\d+)/.exec(scripts);
+    if (fk) out.forks = U.fmtNum(parseInt(fk[1], 10));
+
+    if (!out.stars) out.stars = countText(doc.querySelector('a[href$="/stargazers"]'));
+    if (!out.forks) out.forks = countText(doc.querySelector('a[href$="/forks"]'));
+
+    return out;
+  }
+
+  /**
+   * 搜索结果里的仓库行（/search?q=repo:owner/name&type=repositories）。
+   * 仓库页拿不到语言和更新时间，这两样只有搜索结果页还在 SSR：
+   *   「● JavaScript · ☆ 13.1k · Updated 7 minutes ago」
+   */
+  function parseRepoSearch(doc, fullName) {
+    var out = { description: '', language: '', languageColor: null, stars: '', forks: '', topics: [], updated: null };
+
+    var want = '/' + String(fullName || '').toLowerCase();
+    var boxes = doc.querySelectorAll('[class*="Result__"], [class*="resultRow__"]');
+    var box = null;
+    for (var i = 0; i < boxes.length; i++) {
+      var link = boxes[i].querySelector('a[href]');
+      var href = (link && link.getAttribute('href') || '').toLowerCase().replace(/\/$/, '');
+      if (href === want) {
+        box = boxes[i];
+        break;
+      }
+    }
+    if (!box) return out;
+
+    var desc = box.querySelector('[class*="Content__"]');
+    if (desc) out.description = U.textOf(desc);
+
+    var lang = box.querySelector('[aria-label$=" language"]');
     if (lang) out.language = U.textOf(lang);
 
-    var colorEl = doc.querySelector('.repo-language-color');
-    if (colorEl) out.languageColor = U.colorFromStyle(colorEl.getAttribute('style'));
+    var circle = box.querySelector('[class*="languageCircle"]');
+    if (circle) out.languageColor = U.colorFromStyle(circle.getAttribute('style'));
 
-    var stars = doc.querySelector('#repo-stars-counter-star, a[href$="/stargazers"] .Counter');
-    if (stars) out.stars = U.textOf(stars).replace(/[^\d.,km]/gi, '');
+    out.stars = countText(box.querySelector('a[href$="/stargazers"]'));
+    out.forks = countText(box.querySelector('a[href$="/forks"]'));
+    out.topics = topicsOf(box);
+
+    // 「Updated 7 minutes ago」的精确时间在带 title 的 span 上
+    var foot = box.querySelector('[class*="footer__"]');
+    if (foot) {
+      var stamped = foot.querySelectorAll('span[title]');
+      for (var j = 0; j < stamped.length; j++) {
+        var li = stamped[j].closest ? stamped[j].closest('li') : null;
+        var holder = li || stamped[j].parentElement || stamped[j];
+        if (!/Updated/i.test(U.textOf(holder))) continue;
+        var ts = new Date(stamped[j].getAttribute('title')).getTime();
+        if (!isNaN(ts)) {
+          out.updated = new Date(ts).toISOString();
+          break;
+        }
+      }
+    }
 
     return out;
   }
@@ -564,6 +674,7 @@ GHW.parse = (function () {
     parseRepoList: parseRepoList,
     parseStarredRepos: parseStarredRepos,
     parseRepoHeader: parseRepoHeader,
+    parseRepoSearch: parseRepoSearch,
     parseNotifications: parseNotifications,
     unreadCountFromPage: unreadCountFromPage
   };

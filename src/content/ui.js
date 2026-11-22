@@ -257,10 +257,11 @@ GHW.ui = (function () {
   function repoCard(r) {
     // 关注的项目用「收藏时间」，自己的仓库用「更新时间」
     var when = r.starredAt ? U.relTime(r.starredAt) + '收藏' : r.updated ? U.relTime(r.updated) + '更新' : '';
+    var topics = (r.topics || []).slice(0, 4);
 
     return h(
       'a',
-      { class: 'ghw-repo', href: abs(r.href) },
+      { class: 'ghw-repo', href: abs(r.href), title: r.description || r.fullName },
       h(
         'div',
         { class: 'ghw-repo-head' },
@@ -269,7 +270,20 @@ GHW.ui = (function () {
           ? h('span', { class: 'ghw-badge', text: r.visibility === 'Private' ? '私有' : r.visibility })
           : null
       ),
-      r.description ? h('p', { class: 'ghw-repo-desc', text: r.description }) : null,
+      r.description
+        ? h('p', { class: 'ghw-repo-desc', text: r.description })
+        : r.pending
+          ? h('p', { class: 'ghw-repo-desc is-pending', text: '正在读取仓库信息…' })
+          : null,
+      topics.length
+        ? h(
+            'div',
+            { class: 'ghw-repo-topics' },
+            topics.map(function (t) {
+              return h('span', { class: 'ghw-topic', text: t });
+            })
+          )
+        : null,
       h(
         'div',
         { class: 'ghw-repo-meta' },
@@ -424,13 +438,31 @@ GHW.ui = (function () {
       if (!picks.length) return starredAll.slice(0, settings.starredCount || 6);
       var byName = {};
       starredAll.forEach(function (r) {
-        byName[r.fullName] = r;
+        byName[r.fullName.toLowerCase()] = r;
       });
-      return picks
-        .map(function (n) {
-          return byName[n];
-        })
-        .filter(Boolean);
+      return picks.map(function (n) {
+        var hit = byName[String(n).toLowerCase()];
+        if (hit) return hit;
+        // 元信息还没拉回来（或拉失败了）：先给个占位卡片，
+        // 保证手动添加的仓库至少显示出来，而不是被静默丢掉
+        var parts = String(n).split('/');
+        return {
+          fullName: n,
+          owner: parts[0] || '',
+          name: parts[1] || '',
+          href: '/' + n,
+          description: '',
+          language: '',
+          languageColor: null,
+          stars: '',
+          forks: '',
+          topics: [],
+          starredAt: null,
+          updated: null,
+          visibility: '',
+          pending: true
+        };
+      });
     };
 
     function buildStarPicker() {
@@ -531,7 +563,7 @@ GHW.ui = (function () {
             text:
               '勾选要显示的（' +
               starredAll.length +
-              ' 个来自最近 star，可自由增删）'
+              ' 个来自最近 star；也可以在下面填 owner/repo 加任意仓库）'
           })
         ),
         list,
@@ -578,7 +610,7 @@ GHW.ui = (function () {
     function renderStarred() {
       var body = bodyEls.starred;
       if (!body) return;
-      if (starredEditing && !starredAll.length) starredEditing = false;
+      if (starredEditing && !starredAll.length && !(settings.starredPicks || []).length) starredEditing = false;
 
       starredEditBtn.textContent = starredEditing ? '完成' : '编辑';
       starredEditBtn.classList.toggle('is-active', starredEditing);
@@ -972,16 +1004,45 @@ GHW.ui = (function () {
       },
 
       hasStarred: function (fullName) {
+        var lower = String(fullName || '').toLowerCase();
         return starredAll.some(function (r) {
-          return r.fullName === fullName;
+          return r.fullName.toLowerCase() === lower;
         });
       },
 
-      /** 手动添加的仓库拉到元信息后补进来 */
-      addStarredMeta: function (meta) {
+      /** 面板里正在显示、但还缺元信息（topics 等）的仓库 */
+      pendingStarredMeta: function () {
+        return pickedStarred().filter(function (r) {
+          return !r.topics || !r.topics.length;
+        });
+      },
+
+      /** 拉到仓库元信息后合并回来（手动添加的整条插入，star 列表里的只补缺字段） */
+      mergeStarredMeta: function (meta) {
         if (!meta || !meta.fullName) return;
-        if (app.hasStarred(meta.fullName)) return;
-        starredAll.push(meta);
+        var lower = meta.fullName.toLowerCase();
+        var existing = null;
+        for (var i = 0; i < starredAll.length; i++) {
+          if (starredAll[i].fullName.toLowerCase() === lower) {
+            existing = starredAll[i];
+            break;
+          }
+        }
+
+        if (!existing) {
+          starredAll.push(meta);
+          renderStarred();
+          return;
+        }
+
+        ['description', 'language', 'languageColor', 'stars', 'forks'].forEach(function (k) {
+          if (!existing[k] && meta[k]) existing[k] = meta[k];
+        });
+        if ((!existing.topics || !existing.topics.length) && meta.topics && meta.topics.length) {
+          existing.topics = meta.topics;
+        }
+        if (!existing.updated && meta.updated) existing.updated = meta.updated;
+        if (!existing.starredAt && meta.starredAt) existing.starredAt = meta.starredAt;
         renderStarred();
       },
 

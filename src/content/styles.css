@@ -893,6 +893,26 @@ html.ghw-native-hidden body footer {
   overflow: hidden;
 }
 
+.ghw-repo-desc.is-pending {
+  opacity: 0.65;
+}
+
+.ghw-repo-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ghw-topic {
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--ghw-accent);
+  background: color-mix(in srgb, var(--ghw-accent) 12%, transparent);
+  white-space: nowrap;
+}
+
 .ghw-repo-meta {
   display: flex;
   align-items: center;

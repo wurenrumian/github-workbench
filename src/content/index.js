@@ -63,7 +63,7 @@
       function (res) {
         if (!state.mounted || !state.app) return;
         state.app.apply(name, res);
-        if (name === 'starred') prefetchStarredMeta(state.settings.starredPicks);
+        if (name === 'starred') prefetchStarredMeta();
         if (res.error) {
           state.app.setFooter('部分数据是旧缓存（' + (res.error.message || '抓取失败') + '）', true);
         }
@@ -77,20 +77,34 @@
   }
 
   var pending = 0;
+  var metaInflight = {};
+  var metaQueue = Promise.resolve();
 
-  /** 手动添加的关注项目：仓库元信息没缓存时补拉一次 */
-  function prefetchStarredMeta(picks) {
-    if (!picks || !picks.length || !state.app) return;
-    picks.forEach(function (name) {
-      if (state.app.hasStarred(name)) return;
-      API.repoMeta(name).then(
-        function (meta) {
-          if (state.app) state.app.addStarredMeta(meta);
-        },
-        function () {
-          /* 拉不到就只显示仓库名 */
-        }
-      );
+  /**
+   * 面板里显示的仓库如果还缺 topics / 元信息（手动添加的仓库），
+   * 串行补拉一次。串行是为了别在打开首页时同时打 6 个仓库页。
+   */
+  function prefetchStarredMeta() {
+    if (!state.app) return;
+    var targets = state.app.pendingStarredMeta ? state.app.pendingStarredMeta() : [];
+    targets.forEach(function (item) {
+      var name = item.fullName;
+      if (!name || metaInflight[name]) return;
+      metaInflight[name] = true;
+      metaQueue = metaQueue
+        .then(function () {
+          return API.repoMeta(name, item).then(
+            function (meta) {
+              if (state.app) state.app.mergeStarredMeta(meta);
+            },
+            function () {
+              /* 拉不到就只显示仓库名 */
+            }
+          );
+        })
+        .then(function () {
+          delete metaInflight[name];
+        });
     });
   }
 
@@ -183,7 +197,7 @@
         STORE.saveSettings({ starredPicks: picks }).then(function (s) {
           state.settings = s;
         });
-        prefetchStarredMeta(picks);
+        prefetchStarredMeta();
       },
       onLayout: function (layout) {
         STORE.saveSettings({ layout: layout }).then(function (s) {
