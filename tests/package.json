@@ -1,0 +1,14 @@
+{
+  "name": "tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node parse.test.mjs && node ui.test.mjs"
+  },
+  "keywords": [],
+  "type": "module",
+  "dependencies": {
+    "jsdom": "^31.0.1"
+  }
+}

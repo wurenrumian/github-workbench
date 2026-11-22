@@ -1,0 +1,14 @@
+# deps
+node_modules/
+tests/node_modules/
+package-lock.json
+
+# 打包产物
+dist/
+*.zip
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

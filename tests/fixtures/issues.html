@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="user-login" content="octocat" />
+    <title>Assigned to you · Issues</title>
+  </head>
+  <body>
+    <main>
+      <div class="Box">
+        <div class="Box-header">
+          <h2>3 Open</h2>
+          <a href="/issues/assigned">Issues assigned to you</a>
+          <a href="/notifications">Notifications</a>
+        </div>
+
+        <ul class="list-style-none">
+          <!-- 典型的 issue 行 -->
+          <li class="Box-row">
+            <svg aria-label="issue" role="img" class="octicon octicon-issue-opened" viewBox="0 0 16 16"></svg>
+            <a class="Link--primary v-align-middle" href="/facebook/react/issues/12345">#12345 Fix the thing</a>
+            <a class="Link--muted" href="/facebook/react/issues/12345#issuecomment-987">3 comments</a>
+            <span class="Label Label--secondary">bug</span>
+            <span class="Label Label--secondary">good first issue</span>
+            <relative-time datetime="2026-11-20T10:00:00Z">Nov 20, 2026</relative-time>
+          </li>
+
+          <!-- PR 行，已合并 -->
+          <li class="Box-row">
+            <svg aria-label="merged pull request" role="img" class="octicon octicon-git-merge" viewBox="0 0 16 16"></svg>
+            <a class="Link--primary v-align-middle" href="/vercel/next.js/pull/999">Improve the build cache</a>
+            <relative-time datetime="2026-11-21T08:30:00Z">Nov 21, 2026</relative-time>
+          </li>
+
+          <!-- 更早的一条 -->
+          <li class="Box-row">
+            <svg aria-label="issue" role="img" class="octicon octicon-issue-opened" viewBox="0 0 16 16"></svg>
+            <a class="Link--primary v-align-middle" href="/rust-lang/rust/issues/42">#42 中文标题也要能解析</a>
+            <relative-time datetime="2026-11-01T00:00:00Z">Nov 1, 2026</relative-time>
+          </li>
+        </ul>
+      </div>
+
+      <!-- 干扰项：这些都不该被当成列表项 -->
+      <nav>
+        <a href="/facebook/react/issues">Issues</a>
+        <a href="/facebook/react/pulls">Pull requests</a>
+        <a href="/facebook/react/issues/new">New issue</a>
+      </nav>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitHub Workbench</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="head">
+      <div class="logo" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+      <div>
+        <h1>GitHub Workbench</h1>
+        <p class="sub">把首页换成能干活的个人工作台</p>
+      </div>
+    </header>
+
+    <main>
+      <section class="group">
+        <label class="switch">
+          <input type="checkbox" id="enabled" />
+          <span class="track"></span>
+          <span class="label">启用工作台</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="hideNative" />
+          <span class="track"></span>
+          <span class="label">接管首页（隐藏 For you 流）</span>
+        </label>
+      </section>
+
+      <section class="group">
+        <h2>显示哪些面板</h2>
+        <div class="checks" id="panels"></div>
+      </section>
+
+      <section class="group">
+        <h2>数据</h2>
+        <div class="row">
+          <label for="refreshMinutes">缓存有效期</label>
+          <select id="refreshMinutes">
+            <option value="2">2 分钟</option>
+            <option value="5">5 分钟</option>
+            <option value="10">10 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="60">1 小时</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="listLimit">每个列表显示</label>
+          <select id="listLimit">
+            <option value="5">5 条</option>
+            <option value="8">8 条</option>
+            <option value="12">12 条</option>
+            <option value="20">20 条</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="repoCount">仓库卡片</label>
+          <select id="repoCount">
+            <option value="4">4 个</option>
+            <option value="6">6 个</option>
+            <option value="8">8 个</option>
+            <option value="12">12 个</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/" target="_blank">打开 GitHub 首页</a>
+        <button class="btn" id="clearCache" type="button">清缓存</button>
+      </div>
+      <p class="note" id="note">
+        所有数据都用你自己的登录态在本地抓取，不经过任何第三方服务器。
+      </p>
+    </main>
+
+    <script src="../core/store.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

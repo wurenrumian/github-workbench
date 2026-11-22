@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GitHub Workbench · 效果预览</title>
+    <link rel="stylesheet" href="../src/content/styles.css" />
+    <style>
+      /* 只是给预览页撑个 GitHub 风格的背景，扩展里不需要这段 */
+      html,
+      body {
+        margin: 0;
+        background: #ffffff;
+        color: #1f2328;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      }
+      .demo-bar {
+        padding: 10px 24px;
+        border-bottom: 1px solid #d1d9e0;
+        font-size: 12px;
+        color: #59636e;
+        background: #f6f8fa;
+      }
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background: #0d1117;
+          color: #e6edf3;
+        }
+        .demo-bar {
+          background: #151b23;
+          border-color: #3d444d;
+          color: #9198a1;
+        }
+      }
+
+      /* 预览页里没有 GitHub 自己的样式表，这里补一套包含暗色的变量垫片，
+         让预览和真实页面上的取值一致（扩展里由 GitHub 提供这些变量） */
+      html[data-color-mode='dark'] {
+        --bgColor-default: #0d1117;
+        --bgColor-inset: #010409;
+        --bgColor-muted: #151b23;
+        --fgColor-default: #e6edf3;
+        --fgColor-muted: #9198a1;
+        --borderColor-default: #3d444d;
+        --borderColor-muted: #3d444db3;
+        --fgColor-accent: #4493f8;
+        --fgColor-success: #3fb950;
+        --fgColor-done: #ab7df8;
+        --fgColor-danger: #f85149;
+      }
+      html[data-color-mode='dark'],
+      html[data-color-mode='dark'] body {
+        background: #0d1117;
+        color: #e6edf3;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo-bar">效果预览 · 数据是假的，只用来检查排版</div>
+    <div id="mount" class="ghw-root"></div>
+
+    <script src="../src/core/util.js"></script>
+    <script src="../src/content/ui.js"></script>
+    <script>
+      (function () {
+        // 加上 ?dark 就能看暗色效果
+        if (/dark/.test(location.search)) document.documentElement.dataset.colorMode = 'dark';
+        var U = GHW.util;
+
+        /* --- 造一年的贡献数据，形态和 parseContributions 的输出一致 --- */
+        var days = [];
+        var start = new Date('2025-11-23T00:00:00');
+        for (var i = 0; i < 365; i++) {
+          var d = U.addDays(start, i);
+          var wd = d.getDay();
+          var seed = (i * 2654435761) % 1000;
+          var base = wd === 0 || wd === 6 ? 0 : 3;
+          var count = seed % 100 < 26 ? 0 : base + (seed % 11);
+          if (i > 300 && seed % 7 < 3) count += 4;
+          var level = count === 0 ? 0 : count < 3 ? 1 : count < 6 ? 2 : count < 10 ? 3 : 4;
+          days.push({ date: U.dayKey(d), level: level, count: count });
+        }
+        /* summarize 在 parse.js 里（预览页不加载它），这里算一份等价的结果 */
+        var total = 0,
+          active = 0,
+          longest = 0,
+          run = 0,
+          best = days[0];
+        days.forEach(function (d) {
+          total += d.count;
+          if (d.count) active++;
+          if (d.count > best.count) best = d;
+          if (d.count) {
+            run++;
+            longest = Math.max(longest, run);
+          } else run = 0;
+        });
+        var today = U.dayKey(new Date());
+        var streak = 0;
+        for (var k = days.length - 1; k >= 0; k--) {
+          if (days[k].date === today && days[k].count === 0) continue;
+          if (days[k].count > 0) streak++;
+          else break;
+        }
+        var week = 0;
+        var now = new Date();
+        var monday = U.addDays(now, -((now.getDay() + 6) % 7));
+        for (var w = 0; w < 7; w++) {
+          var key = U.dayKey(U.addDays(monday, w));
+          days.forEach(function (d) {
+            if (d.date === key) week += d.count;
+          });
+        }
+
+        var contributions = {
+          days: days,
+          total: total,
+          activeDays: active,
+          todayCount: days[days.length - 1].count,
+          currentStreak: streak,
+          longestStreak: longest,
+          weekTotal: week,
+          bestDay: best,
+          from: days[0].date,
+          to: days[days.length - 1].date
+        };
+
+        var settings = {
+          enabled: true,
+          hideNative: true,
+          refreshMinutes: 10,
+          listLimit: 8,
+          repoCount: 6,
+          panels: {
+            contributions: true,
+            assigned: true,
+            review: true,
+            opened: true,
+            notifications: true,
+            repos: true,
+            pinned: true
+          }
+        };
+
+        var app = GHW.ui.create({
+          login: 'octocat',
+          settings: settings,
+          onRefresh: function () {},
+          onRetry: function () {},
+          onToggleNative: function () {}
+        });
+        document.getElementById('mount').appendChild(app.el);
+
+        app.apply('profile', {
+          data: {
+            meta: { name: 'The Octocat', bio: 'Builds small things. Occasionally breaks bigger ones.', followers: '16.4k', following: '9', location: 'Hangzhou', company: 'GitHub', website: 'https://octocat.example.com' },
+            pinned: [
+              { fullName: 'octocat/Hello-World', href: '/octocat/Hello-World', description: 'My first repository on GitHub', language: 'Ruby', languageColor: '#701516', stars: '2.7k' },
+              { fullName: 'octocat/spoon-knife', href: '/octocat/spoon-knife', description: 'React hooks 的边角料收集', language: 'TypeScript', languageColor: '#3178c6', stars: '318' }
+            ]
+          }
+        });
+
+        app.apply('contributions', { data: contributions, fromCache: true, at: Date.now() });
+
+        app.apply('assigned', {
+          data: [
+            { type: 'issue', number: 1284, title: '虚拟列表滚动到底部时偶发白屏', href: '/acme/web/issues/1284', repoFullName: 'acme/web', updated: '2026-11-21T09:00:00Z', state: 'open', labels: ['bug', 'P1'] },
+            { type: 'issue', number: 77, title: 'Support streaming responses in the SDK', href: '/acme/sdk/issues/77', repoFullName: 'acme/sdk', updated: '2026-11-20T15:20:00Z', state: 'open', labels: ['enhancement'] },
+            { type: 'issue', number: 9, title: 'CI 在 Windows runner 上超时', href: '/acme/infra/issues/9', repoFullName: 'acme/infra', updated: '2026-11-18T02:10:00Z', state: 'open', labels: [] }
+          ]
+        });
+
+        app.apply('review', {
+          data: [
+            { type: 'pr', number: 331, title: 'refactor: 拆掉 useSession 里的隐式全局状态', href: '/acme/web/pull/331', repoFullName: 'acme/web', updated: '2026-11-22T00:40:00Z', state: 'open', labels: ['review'] },
+            { type: 'pr', number: 45, title: 'Add retry with jitter to the HTTP client', href: '/acme/sdk/pull/45', repoFullName: 'acme/sdk', updated: '2026-11-19T11:00:00Z', state: 'open', labels: [] }
+          ]
+        });
+
+        app.apply('opened', {
+          data: [
+            { type: 'pr', number: 1202, title: 'fix: 修正时区换算', href: '/acme/web/pull/1202', repoFullName: 'acme/web', updated: '2026-11-20T07:30:00Z', state: 'draft', labels: [] }
+          ]
+        });
+
+        app.apply('notifications', {
+          data: [
+            { title: '你在 acme/web#1284 中被 @ 了', href: '/acme/web/issues/1284', repo: 'acme/web', reason: 'mention', unread: true, updated: '2026-11-22T02:00:00Z' },
+            { title: 'acme/sdk#77 有新回复', href: '/acme/sdk/issues/77', repo: 'acme/sdk', reason: 'comment', unread: true, updated: '2026-11-21T18:10:00Z' },
+            { title: 'PR acme/web#1202 的检查通过了', href: '/acme/web/pull/1202', repo: 'acme/web', reason: 'ci', unread: false, updated: '2026-11-20T09:00:00Z' }
+          ]
+        });
+
+        app.apply('repos', {
+          data: [
+            { fullName: 'octocat/Hello-World', href: '/octocat/Hello-World', description: 'My first repository on GitHub', language: 'Ruby', languageColor: '#701516', stars: '2.7k', updated: '2026-11-22T01:31:18Z', visibility: 'Public' },
+            { fullName: 'octocat/spoon-knife', href: '/octocat/spoon-knife', description: 'React hooks 的边角料收集', language: 'TypeScript', languageColor: '#3178c6', stars: '318', updated: '2026-11-19T12:00:00Z', visibility: 'Public' },
+            { fullName: 'octocat/notes', href: '/octocat/notes', description: '', language: 'Markdown', languageColor: '#083fa1', stars: '12', updated: '2026-11-10T08:00:00Z', visibility: 'Private' },
+            { fullName: 'octocat/dotfiles', href: '/octocat/dotfiles', description: 'chezmoi 管理的跨机器配置', language: 'Shell', languageColor: '#89e051', stars: '64', updated: '2026-10-28T08:00:00Z', visibility: 'Private' }
+          ]
+        });
+
+        app.setFooter('更新于 09:41 · 缓存 10 分钟');
+      })();
+    </script>
+  </body>
+</html>
+
+
