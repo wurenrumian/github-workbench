@@ -12,3 +12,6 @@ dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# ./tmp —— 过程性记忆，默认不进版本库（整个目录）
+/tmp/
