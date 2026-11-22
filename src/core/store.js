@@ -20,20 +20,22 @@ GHW.store = (function () {
     enabled: true,
     // 关掉 GitHub 原生首页（For you 流 + 右侧栏），换成我们的工作台
     hideNative: true,
-    // 只替换中间那一列 feed，保留页面的 Home 标题 / 搜索框 / 切换条
-    keepChrome: true,
+    // 保留 GitHub 左侧原生导航栏（默认收起，版面更宽）
+    keepChrome: false,
     // 缓存有效期（分钟）
     refreshMinutes: 10,
     // 每个列表最多显示多少条
     listLimit: 8,
     // 最近更新仓库显示多少个
     repoCount: 8,
+    // 关注的项目显示多少个
+    starredCount: 6,
     panels: {
       contributions: true,
-      assigned: true,
+      issues: true,
       review: true,
       opened: true,
-      notifications: true,
+      starred: true,
       repos: true,
       pinned: true
     }

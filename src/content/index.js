@@ -23,6 +23,7 @@
     settings: null,
     app: null,
     root: null,
+    pane: null,
     mode: null,
     mounted: false,
     seq: 0
@@ -50,10 +51,10 @@
     var list = ['profile'];
     if (p.contributions) list.unshift('contributions');
     if (p.repos) list.push('repos');
-    if (p.assigned) list.push('assigned');
+    if (p.starred) list.push('starred');
+    if (p.issues) list.push('assigned', 'created');
     if (p.review) list.push('review');
     if (p.opened) list.push('opened');
-    if (p.notifications) list.push('notifications');
     return list;
   }
 
@@ -104,29 +105,40 @@
 
   /* --------------------------------------------------------- 挂载 / 卸载 */
 
-  function findFeed() {
-    var main = document.querySelector('main');
-    if (!main) return null;
-    var feed = main.querySelector(
-      'feed-container, [data-active-topic], [class*="feed-container"], .js-feed-container'
-    );
-    return feed && feed.parentElement ? feed : null;
-  }
-
   /**
-   * 决定把工作台挂到哪：
-   *  - surgical：找到 feed 容器，替换它，页面顶部原样保留
-   *  - full：找不到 feed（或用户关掉了 keepChrome），整页接管
+   * 决定把工作台挂到哪。
+   *
+   * 现在的首页是 .application-main > .color-bg-default > .feed-background（flex 行）
+   *   ├ aside.feed-left-sidebar      左侧导航
+   *   └ div.flex-auto.col-md-8       ← main 埋在这层里面
+   *
+   * 所以要一路往上找到 .feed-background 的直接子节点，整块藏掉、工作台占它的位置，
+   * 否则挂在 main 旁边只能拿到 680px 宽，右边空一大片。
+   *
+   * insertBefore 必须容错：GitHub 的层级经常变，之前就是参照节点不是直接子节点
+   * 导致抛 NotFoundError，整个脚本在挂载那一步就崩了。
    */
-  function resolveMount() {
-    var feed = findFeed();
-    if (state.settings.keepChrome && feed) {
-      return { mode: 'surgical', before: feed, host: feed.parentElement };
+  function planMount() {
+    var main = document.querySelector('main');
+    if (!main) {
+      var fallbackHost = hostEl();
+      return fallbackHost ? { mode: 'append', host: fallbackHost, before: null, pane: null } : null;
     }
 
-    var host = hostEl();
-    if (!host) return null;
-    return { mode: 'full', before: host.querySelector('main') || host.firstChild, host: host };
+    var row = main.closest('.feed-background') || document.querySelector('.color-bg-default');
+
+    var pane = main;
+    while (row && pane.parentElement && pane.parentElement !== row) {
+      pane = pane.parentElement;
+    }
+
+    if (row && pane.parentElement === row) {
+      return { mode: 'replace-pane', host: row, before: pane, pane: pane };
+    }
+    if (main.parentElement) {
+      return { mode: 'replace-main', host: main.parentElement, before: main, pane: main };
+    }
+    return { mode: 'append', host: hostEl() || document.body, before: null, pane: null };
   }
 
   function mount() {
@@ -135,7 +147,7 @@
     var login = API.getLogin();
     if (!login) return; // 没登录就不接管首页
 
-    var plan = resolveMount();
+    var plan = planMount();
     if (!plan) return;
 
     var root = h('div', { id: ROOT_ID, class: 'ghw-root' });
@@ -160,7 +172,17 @@
     });
 
     root.appendChild(app.el);
-    plan.host.insertBefore(root, plan.before);
+    if (plan.before && plan.before.parentNode === plan.host) {
+      plan.host.insertBefore(root, plan.before);
+    } else {
+      plan.host.appendChild(root);
+    }
+
+    // 标记被顶替的那一层，CSS 里按这个类名隐藏，比死认 main 稳
+    if (plan.pane) {
+      plan.pane.classList.add('ghw-native-pane');
+      state.pane = plan.pane;
+    }
 
     state.root = root;
     state.app = app;
@@ -179,15 +201,20 @@
     // 关掉 hideNative 时不是卸载，而是把原生内容露出来放到工作台下面 ——
     // 这样那个开关永远是双向可逆的，不用再去点扩展图标。
     var hide = !!state.settings.hideNative;
-    document.documentElement.classList.toggle('ghw-surgical', hide && state.mode === 'surgical');
-    document.documentElement.classList.toggle('ghw-native-hidden', hide && state.mode !== 'surgical');
+    document.documentElement.classList.toggle('ghw-native-hidden', hide);
+    // 想更宽的版面时，可以把 GitHub 的左侧导航一起收掉
+    document.documentElement.classList.toggle('ghw-hide-sidebar', hide && !state.settings.keepChrome);
     if (state.app) state.app.setNativeVisible(!hide);
   }
 
   function unmount() {
     if (state.root && state.root.parentNode) state.root.parentNode.removeChild(state.root);
+    if (state.pane) {
+      state.pane.classList.remove('ghw-native-pane');
+      state.pane = null;
+    }
     document.documentElement.classList.remove('ghw-native-hidden');
-    document.documentElement.classList.remove('ghw-surgical');
+    document.documentElement.classList.remove('ghw-hide-sidebar');
     state.root = null;
     state.app = null;
     state.mode = null;
@@ -221,13 +248,6 @@
           state.root = null;
         }
         if (state.mounted) {
-          // 首屏时 feed 可能还没渲染出来，导致我们先走了整页接管。
-          // 一旦 feed 出现，就切回「只替换 feed」，把顶部栏还回去。
-          if (state.mode === 'full' && settings.keepChrome && findFeed()) {
-            unmount();
-            mount();
-            return;
-          }
           applyNativeVisibility();
           return;
         }
@@ -256,19 +276,22 @@
     if (state.mounted) unmount();
   });
 
-  // React 重新渲染时可能把我们的节点挤掉，或者又把原生内容塞回来
+  // React 重新渲染时可能把我们的节点挤掉，或者把原生内容塞回来
   var observer = new MutationObserver(function () {
-    if (state.mounted && (!state.root || !state.root.isConnected)) {
+    if (!state.mounted) return;
+    if (!state.root || !state.root.isConnected) {
       state.mounted = false;
       state.app = null;
       state.root = null;
+      state.pane = null;
       ensure();
       return;
     }
-    if (state.mounted) {
-      // GitHub 可能把原生内容又塞回来，或者把我们的类名抹掉，这里重新对齐一次
-      applyNativeVisibility();
+    // GitHub 重渲染时会把 className 重置，补回去
+    if (state.pane && state.pane.isConnected && !state.pane.classList.contains('ghw-native-pane')) {
+      state.pane.classList.add('ghw-native-pane');
     }
+    applyNativeVisibility();
   });
 
   function startObserving() {

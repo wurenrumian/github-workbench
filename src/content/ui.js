@@ -113,7 +113,7 @@ GHW.ui = (function () {
       monthRow.appendChild(
         h('span', {
           class: 'ghw-heat-month',
-          style: { left: c * 13 + 'px' },
+          style: { left: c * 12 + 'px' },
           text: MONTHS[mm - 1]
         })
       );
@@ -222,37 +222,6 @@ GHW.ui = (function () {
                 })
               )
             : null
-        )
-      );
-    });
-    body.appendChild(frag);
-  }
-
-  function renderNotifications(body, items) {
-    body.textContent = '';
-    if (!items.length) {
-      body.appendChild(emptyState('没有未读通知', '清空了，去写代码吧'));
-      return;
-    }
-    var frag = document.createDocumentFragment();
-    items.forEach(function (it) {
-      frag.appendChild(
-        h(
-          'a',
-          { class: 'ghw-row' + (it.unread === false ? ' is-read' : ''), href: abs(it.href), title: it.title },
-          h('span', { class: 'ghw-state ghw-state--notify', 'aria-hidden': 'true' }),
-          h(
-            'span',
-            { class: 'ghw-row-body' },
-            h('span', { class: 'ghw-row-title', text: it.title }),
-            h(
-              'span',
-              { class: 'ghw-row-meta' },
-              it.repo ? h('span', { class: 'ghw-repo-name', text: it.repo }) : null,
-              it.reason ? h('span', { class: 'ghw-dim', text: it.reason }) : null,
-              it.updated ? h('span', { class: 'ghw-dim', text: U.relTime(it.updated) }) : null
-            )
-          )
         )
       );
     });
@@ -393,6 +362,91 @@ GHW.ui = (function () {
 
     var contributionsPanel = panel('contributions', '贡献日历', '/' + login, '个人主页');
 
+    /* --- Issues 面板：一个面板两个 tab，指派给我 / 我创建的 --- */
+
+    var issueState = { active: 'assigned', picked: false };
+    var issueTabs = {};
+    var issuesTotal = h('span', { class: 'ghw-count is-hidden' });
+    var issuesMore = h('a', { class: 'ghw-panel-more', href: abs(LINKS.assigned), text: '全部' });
+
+    function issueTab(key, label, href) {
+      var countEl = h('span', { class: 'ghw-tab-count' });
+      var tab = h(
+        'button',
+        {
+          class: 'ghw-tab' + (key === issueState.active ? ' is-active' : ''),
+          type: 'button',
+          dataset: { tab: key },
+          onclick: function () {
+            issueState.picked = true;
+            selectIssueTab(key);
+          }
+        },
+        h('span', { text: label }),
+        countEl
+      );
+      var pane = h('div', { class: 'ghw-tab-pane' + (key === issueState.active ? ' is-active' : '') }, skeletonRows(3));
+
+      bodyEls[key] = pane;
+      sections[key] = { count: countEl, body: pane, href: href, section: null };
+      issueTabs[key] = { tab: tab, pane: pane, count: countEl, href: href, n: null };
+      return tab;
+    }
+
+    function refreshIssuesTotal() {
+      var sum = 0;
+      var any = false;
+      Object.keys(issueTabs).forEach(function (k) {
+        var n = issueTabs[k].n;
+        if (n == null) return;
+        any = true;
+        sum += n;
+      });
+      issuesTotal.textContent = any ? String(sum) : '';
+      issuesTotal.classList.toggle('is-hidden', !any || sum === 0);
+
+      // 两个 tab 都没数据、或者用户手动选过，就别自作主张
+      if (issueState.picked) return;
+      var other = issueState.active === 'assigned' ? 'created' : 'assigned';
+      var activeN = issueTabs[issueState.active].n;
+      var otherN = issueTabs[other].n;
+      if (activeN === 0 && otherN > 0) selectIssueTab(other);
+      else if (activeN > 0 && otherN === 0) selectIssueTab(issueState.active);
+    }
+
+    function selectIssueTab(key) {
+      issueState.active = key;
+      Object.keys(issueTabs).forEach(function (k) {
+        issueTabs[k].tab.classList.toggle('is-active', k === key);
+        issueTabs[k].pane.classList.toggle('is-active', k === key);
+      });
+      issuesMore.setAttribute('href', abs(issueTabs[key].href));
+    }
+
+    var issuesPanelEl = h(
+      'section',
+      { class: 'ghw-panel', 'data-panel': 'issues' },
+      h(
+        'header',
+        { class: 'ghw-panel-head' },
+        h('h2', { class: 'ghw-panel-title' }, h('span', { text: 'Issues' }), issuesTotal),
+        issuesMore
+      ),
+      h(
+        'div',
+        { class: 'ghw-tabs' },
+        issueTab('assigned', '指派给我', LINKS.assigned),
+        issueTab('created', '我创建的', LINKS.issues + '?q=is%3Aissue+is%3Aopen+author%3A%40me')
+      ),
+      h(
+        'div',
+        { class: 'ghw-panel-body' },
+        Object.keys(issueTabs).map(function (k) {
+          return issueTabs[k].pane;
+        })
+      )
+    );
+
     var mainCol = h(
       'div',
       { class: 'ghw-col ghw-col-main' },
@@ -400,16 +454,16 @@ GHW.ui = (function () {
       settings.panels.repos
         ? panel('repos', '最近更新', '/' + login + '?tab=repositories&sort=updated', '全部仓库')
         : null,
+      settings.panels.starred ? panel('starred', '关注的项目', LINKS.stars, '全部') : null,
       settings.panels.pinned ? panel('pinned', '置顶', '/' + login, '个人主页') : null
     );
 
     var sideCol = h(
       'div',
       { class: 'ghw-col ghw-col-side' },
-      settings.panels.assigned ? panel('assigned', '指派给我', LINKS.assigned) : null,
+      settings.panels.issues ? issuesPanelEl : null,
       settings.panels.review ? panel('review', '等我评审', LINKS.review) : null,
-      settings.panels.opened ? panel('opened', '我开的 PR', LINKS.pulls) : null,
-      settings.panels.notifications ? panel('notifications', '通知', LINKS.notifications) : null
+      settings.panels.opened ? panel('opened', '我开的 PR', LINKS.pulls) : null
     );
 
     var metaLine = h('div', { class: 'ghw-meta-line' });
@@ -445,6 +499,14 @@ GHW.ui = (function () {
       },
 
       setCount: function (name, n) {
+        // Issues 面板的两个 tab 始终显示数字（0 也是有意义的信息）
+        if (issueTabs[name]) {
+          issueTabs[name].n = n == null ? null : n;
+          issueTabs[name].count.textContent = n == null ? '' : String(n);
+          issueTabs[name].count.classList.toggle('is-zero', !n);
+          refreshIssuesTotal();
+          return;
+        }
         var s = sections[name];
         if (!s) return;
         if (n == null || n <= 0) {
@@ -519,18 +581,24 @@ GHW.ui = (function () {
           return;
         }
 
-        if (name === 'notifications') {
-          renderNotifications(body, data || []);
-          app.setCount(name, (data || []).length);
+        if (name === 'starred') {
+          renderRepos(body, (data || []).slice(0, settings.starredCount || 6));
+          app.setCount(name, null);
           return;
         }
 
-        // assigned / review / opened
+        // assigned / created / review / opened
         var items = data || [];
+        var EMPTY = {
+          assigned: ['没有指派给你的 issue', '难得清静'],
+          created: ['你还没有创建 issue', null],
+          review: ['没有等你评审的 PR', null],
+          opened: ['你没有开着的 PR', null]
+        };
+        var empty = EMPTY[name] || ['暂无', null];
         renderIssueRows(body, items.slice(0, settings.listLimit), {
-          emptyText:
-            name === 'assigned' ? '没有指派给你的 issue' : name === 'review' ? '没有等你评审的 PR' : '你没有开着的 PR',
-          emptyHint: name === 'assigned' ? '难得清静' : null
+          emptyText: empty[0],
+          emptyHint: empty[1]
         });
         app.setCount(name, items.length);
       },

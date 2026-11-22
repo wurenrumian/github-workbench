@@ -9,10 +9,10 @@
 
   var PANELS = [
     ['contributions', '贡献日历'],
-    ['assigned', '指派给我'],
+    ['issues', 'Issues'],
     ['review', '等我评审'],
     ['opened', '我开的 PR'],
-    ['notifications', '通知'],
+    ['starred', '关注的项目'],
     ['repos', '最近更新'],
     ['pinned', '置顶仓库']
   ];

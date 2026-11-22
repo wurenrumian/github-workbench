@@ -1,6 +1,6 @@
 # GitHub Workbench
 
-把 `github.com` 首页换成一块真正能干活的个人工作台：贡献日历、指派给你的 issue、等你评审的 PR、未读通知、最近更新的仓库。
+把 `github.com` 首页换成一块真正能干活的个人工作台：贡献日历、指派给我 / 我创建的 issue、等你评审的 PR、关注的项目、最近更新的仓库。
 
 > 现状是首页越来越像内容流（For you / 推荐 / AI 摘要），想看的东西永远要点三层。
 > 社区的旧方案（`old-github-feed`、`bring-github-old-feed-back` 之类）都是给原生 feed 打补丁，
@@ -20,25 +20,41 @@
 
 ## 接管方式
 
-默认只替换中间那一列 feed：全局导航、`Home` 标题、页面里的搜索框、`For you / Following` 切换条全部保留，工作台直接顶替 feed 的位置，右侧的原生栏一起收起来。
+现在的首页结构是：
 
-实现上就是找 `feed-container` / `.feed-right-sidebar` 藏掉，把工作台插在 feed 原来的位置（`src/content/index.js` 的 `resolveMount`）。找不到 feed 结构时自动退回「整页接管」，不会出现半截页面。
+```
+.application-main > .color-bg-default > .feed-background（flex 行）
+   ├ aside.feed-left-sidebar        左侧导航
+   └ div.flex-auto.col-md-8         ← main 埋在这层里面
+```
 
-两者可以在扩展弹窗里切：「保留页面顶部」关掉就是整页接管。
+扩展会一路往上找到 `.feed-background` 的直接子节点，把那一整块（也就是原生 dashboard 内容）藏掉，工作台插在同级位置占满整行。全局导航、搜索框、头像菜单这些都在 `main` 外面，完全不动。
+
+默认连左侧原生导航一起收起，版面更宽；弹窗里打开「保留左侧原生导航栏」就留着它。
+
+`insertBefore` 的参照节点做了容错——GitHub 的 DOM 层级改了也不会让脚本在挂载那一步抛 `NotFoundError`（这个坑踩过一次：表现是页面「看起来完全没变化」）。
 
 ## 面板
 
 | 面板 | 数据来源 |
 | --- | --- |
 | 贡献日历 + 统计 | `/users/<you>/contributions` |
-| 指派给我 | `/issues/assigned` |
-| 等我评审 | `/pulls/review-requested` |
-| 我开的 PR | `/pulls` |
-| 通知 | `/notifications` |
+| Issues（指派给我 / 我创建的） | `/search?q=is:issue+…+assignee/@author:@me&type=issues` |
+| 等我评审 | `/search?q=is:pr+is:open+review-requested:@me&type=pullrequests` |
+| 我开的 PR | `/search?q=is:pr+is:open+author:@me&type=pullrequests` |
+| 关注的项目 | `/stars` |
 | 最近更新 | `/<you>?tab=repositories&sort=updated` |
 | 置顶 / 个人信息 | `/<you>` |
 
 贡献日历不是截图式的装饰：它从页面的 `<tool-tip>` 里读回每天的精确次数，所以「今日 / 本周 / 连续 / 最长」都是算出来的，不是猜的。
+
+### 为什么 issue 列表走 `/search`
+
+2026 版的 `/issues/assigned`、`/pulls`、`/pulls/review-requested` 已经变成纯 React 壳：服务端返回的 HTML 里**一个 `/owner/repo/pull/123` 链接都没有**，列表要等客户端用 GraphQL 拉回来，而那个请求需要 CSRF token，网页里拿不到。
+
+只有 `/search?q=…&type=issues|pullrequests` 还是服务端渲染的，链接和标题都在 HTML 里。所以 issue / PR 三个面板都走搜索路由。
+
+同理，通知中心（`/notifications`）也是纯壳、`/watching` 也是空的，所以没有通知面板——这个暂时无解，除非你愿意配一个 PAT。
 
 ## 安装
 
@@ -56,7 +72,7 @@ Chrome / Edge：
 点扩展图标：
 
 - 总开关、是否接管首页
-- 只替换 feed（保留页面顶部）还是整页接管
+- 是否保留左侧原生导航栏
 - 每个面板单独开关
 - 缓存有效期（2 分钟 ~ 1 小时）、列表条数
 - 清缓存
@@ -66,9 +82,9 @@ Chrome / Edge：
 ```
 github.com 首页加载
    │
-   ├─ index.js   判断路由（只接管 / 和 /dashboard），决定挂载位置：
-   │             找到 feed-container 就替换它（保留页面顶部），
-   │             找不到就整页接管（给 <html> 加 ghw-native-hidden 藏掉 main）
+   ├─ index.js   判断路由（只接管 / 和 /dashboard），定位挂载点：
+   │             往上找到 .feed-background 的直接子节点（装着 main 的那层），
+   │             工作台插在它同级，给它打上 .ghw-native-pane 让 CSS 藏掉
    │
    ├─ api.js     同源 fetch 上面那几个页面（带 cookie），带 TTL 缓存
    │             某个源失败不影响其它面板，失败时优先用旧缓存
@@ -76,7 +92,7 @@ github.com 首页加载
    ├─ parse.js   DOMParser 解析 HTML：
    │             贡献日历 → td[data-date] + tool-tip
    │             issue 列表 → 反查 /owner/repo/(issues|pull)/123 形式的链接
-   │             仓库列表 → li[itemprop="owns"]
+   │             仓库列表 → li[itemprop="owns"] / ul.repo-list
    │
    └─ ui.js      纯 DOM 构造渲染（一律 textContent，不拼 innerHTML）
 ```
@@ -117,23 +133,27 @@ npm test
 跑的是两件事：
 
 - `parse.test.mjs`：拿真实抓下来的 contributions / repositories 页面 + 手写的 issue、通知 fixture，验证解析和统计。
-- `ui.test.mjs`：在 jsdom 里把所有面板渲染一遍，确认不炸、条目数对、用户可控文本不会被当 HTML 执行。
+- `ui.test.mjs`：在 jsdom 里把所有面板渲染一遍，确认不炸、条目数对、Issues 两个 tab 能切、用户可控文本不会被当 HTML 执行。
 
 ## 当 GitHub 又改版了
 
 解析层刻意写成「主选择器 + 启发式兜底」，所以大部分改版不会直接挂。如果某个面板空了：
 
-1. 打开对应页面（比如 `/issues/assigned`），看 DOM 结构变了多少；
+1. 打开对应页面（比如 `/search?q=is:issue+assignee:@me&type=issues`），看 DOM 结构变了多少；
 2. 改 `src/core/parse.js` 里对应的一个函数；
 3. 往 `tests/fixtures/` 丢一份新页面，加几条断言，跑 `npm test`。
+
+改之前先确认「这个页面还有没有服务端渲染」——2026 年这波改版把一批页面变成了纯 React 壳（见上文 `/search` 那段），那种页面上链接根本就不存在，改解析器也没用，得换入口。
 
 数据源全在 `src/core/api.js` 的 `SOURCES` 表里，加一个源 = 加一个函数 + 一个面板。
 
 ## 已知限制
 
 - 只用 GitHub 的**网页结构**，不是官方 API，所以有改版风险（上面写了怎么修）。
+- 没有通知面板：`/notifications` 是纯客户端渲染，拿不到数据。
+- 「关注的项目」用的是 star 列表；GitHub 的 watch 列表（`/watching`）同样拿不到。
 - 首页之外的页面什么都不做，不会注入任何 UI。
-- 每次刷新首页最多发 7 个同源请求（都有缓存，默认 10 分钟）。嫌多可以把面板关掉，关掉的面板不会发请求。
+- 每次刷新最多发 6 个同源请求（都有缓存，默认 10 分钟）。嫌多可以把面板关掉，关掉的面板不会发请求。
 - 企业版 / GitHub Enterprise 的自托管域名没有适配（改 `manifest.json` 的 `matches` 即可）。
 
 ## Roadmap

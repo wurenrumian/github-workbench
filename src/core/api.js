@@ -59,6 +59,16 @@ GHW.api = (function () {
       });
   }
 
+  /**
+   * issue / PR 列表唯一还能拿到服务端渲染数据的入口是 /search。
+   * /issues/assigned、/pulls、/pulls/review-requested 在 2026 版里都变成了
+   * 纯 React 壳：SSR 的 HTML 里一个 /owner/repo/pull/123 链接都没有，
+   * 数据要等客户端 GraphQL 拉回来，而我们拿不到那个请求。
+   */
+  function searchUrl(query, type) {
+    return '/search?q=' + query + '&type=' + type + '&s=updated&o=desc';
+  }
+
   var SOURCES = {
     contributions: function (login) {
       return fetchHtml('/users/' + encodeURIComponent(login) + '/contributions').then(function (doc) {
@@ -78,31 +88,36 @@ GHW.api = (function () {
       });
     },
 
+    // 指派给我
     assigned: function () {
-      return fetchHtml('/issues/assigned').then(function (doc) {
-        return P.parseIssueList(doc).filter(function (i) {
-          return i.type === 'issue';
-        });
+      return fetchHtml(searchUrl('is%3Aissue+is%3Aopen+assignee%3A%40me', 'issues')).then(function (doc) {
+        return P.parseIssueList(doc);
+      });
+    },
+
+    // 我创建的 issue
+    created: function () {
+      return fetchHtml(searchUrl('is%3Aissue+is%3Aopen+author%3A%40me', 'issues')).then(function (doc) {
+        return P.parseIssueList(doc);
       });
     },
 
     review: function () {
-      return fetchHtml('/pulls/review-requested').then(function (doc) {
+      return fetchHtml(searchUrl('is%3Apr+is%3Aopen+review-requested%3A%40me', 'pullrequests')).then(function (doc) {
         return P.parseIssueList(doc);
       });
     },
 
     opened: function () {
-      return fetchHtml('/pulls').then(function (doc) {
-        return P.parseIssueList(doc).filter(function (i) {
-          return i.type === 'pr';
-        });
+      return fetchHtml(searchUrl('is%3Apr+is%3Aopen+author%3A%40me', 'pullrequests')).then(function (doc) {
+        return P.parseIssueList(doc);
       });
     },
 
-    notifications: function () {
-      return fetchHtml('/notifications').then(function (doc) {
-        return P.parseNotifications(doc, 20);
+    // 关注的项目：/watching 是空壳，/stars 还是老的 SSR 列表
+    starred: function () {
+      return fetchHtml('/stars?tab=stars').then(function (doc) {
+        return P.parseStarredRepos(doc, 20);
       });
     },
 

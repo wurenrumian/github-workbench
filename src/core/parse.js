@@ -376,6 +376,53 @@ GHW.parse = (function () {
     return limit ? out.slice(0, limit) : out;
   }
 
+  /**
+   * 收藏（star）的仓库：/stars 仍然是服务端渲染的老式列表，结构最稳的一个源。
+   * 行：ul.repo-list > li，标题 a[href="/owner/name"]，描述 p，语言 .repo-language-color
+   */
+  function parseStarredRepos(doc, limit) {
+    var out = [];
+    var rows = doc.querySelectorAll('ul.repo-list > li, li[class*="border-bottom"]');
+
+    for (var i = 0; i < rows.length; i++) {
+      var li = rows[i];
+      var link = li.querySelector('h3 a[href], a[href]');
+      if (!link) continue;
+      var href = link.getAttribute('href') || '';
+      if (!/^\/[^\/]+\/[^\/]+\/?$/.test(href)) continue;
+      if (/^\/(stars|topics|settings|orgs|users)\//.test(href)) continue;
+
+      var parts = href.replace(/^\//, '').replace(/\/$/, '').split('/');
+      var desc = li.querySelector('p');
+      var lang = li.querySelector('[itemprop="programmingLanguage"]');
+      var colorEl = li.querySelector('.repo-language-color');
+      var stars = li.querySelector('a[href$="/stargazers"]');
+
+      out.push({
+        fullName: parts[0] + '/' + parts[1],
+        owner: parts[0],
+        name: parts[1],
+        href: href,
+        description: desc ? U.textOf(desc) : '',
+        language: lang ? U.textOf(lang) : '',
+        languageColor: U.colorFromStyle(colorEl && colorEl.getAttribute('style')),
+        stars: stars ? U.textOf(stars).replace(/[^\d.,km]/gi, '') : '',
+        updated: null,
+        visibility: ''
+      });
+    }
+
+    // 去重（同一个仓库在页面里可能出现两次）
+    var seen = {};
+    out = out.filter(function (r) {
+      if (seen[r.fullName]) return false;
+      seen[r.fullName] = 1;
+      return true;
+    });
+
+    return limit ? out.slice(0, limit) : out;
+  }
+
   /** 当前页面顶栏的通知未读数（不用额外发请求） */
   function unreadCountFromPage(doc) {
     var doc2 = doc || document;
@@ -402,6 +449,7 @@ GHW.parse = (function () {
     parseProfile: parseProfile,
     parsePinned: parsePinned,
     parseRepoList: parseRepoList,
+    parseStarredRepos: parseStarredRepos,
     parseNotifications: parseNotifications,
     unreadCountFromPage: unreadCountFromPage
   };
