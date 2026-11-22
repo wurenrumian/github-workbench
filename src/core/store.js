@@ -17,9 +17,8 @@ GHW.store = (function () {
   var CACHE_PREFIX = 'ghw:cache:';
 
   var DEFAULTS = {
+    // 总开关：开 = 接管内容区，关 = 完全不介入（没有「半接管」这种中间状态）
     enabled: true,
-    // 关掉 GitHub 原生首页（For you 流 + 右侧栏），换成我们的工作台
-    hideNative: true,
     // 保留 GitHub 左侧原生导航栏（默认收起，版面更宽）
     keepChrome: false,
     // 缓存有效期（分钟）

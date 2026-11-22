@@ -43,7 +43,6 @@ const GHW = window.GHW;
 
 const settings = {
   enabled: true,
-  hideNative: true,
   keepChrome: false,
   refreshMinutes: 10,
   listLimit: 8,
@@ -67,7 +66,6 @@ const app = GHW.ui.create({
   settings,
   onRefresh: () => calls.push('refresh'),
   onRetry: (n) => calls.push('retry:' + n),
-  onToggleNative: () => calls.push('toggle'),
   onSavePicks: (picks) => (calls.picks = picks)
 });
 document.body.appendChild(app.el);
@@ -206,13 +204,12 @@ console.log('\n[错误与安全]');
   check('标题里的 HTML 不会被解析', () => assert(q('[data-panel="issues"] img').length === 0, '出现了 img 节点，说明用了 innerHTML'));
 }
 
-console.log('\n[刷新 / 切换]');
+console.log('\n[刷新]');
 {
   document.querySelector('.ghw-hero-btns .ghw-btn').click();
   check('刷新按钮触发回调', () => assert(calls.includes('refresh'), '回调没触发'));
-  app.setNativeVisible(true);
-  check('原生页面按钮文案切换', () =>
-    assert(document.querySelectorAll('.ghw-hero-btns .ghw-btn')[1].textContent === '回到工作台', '文案没变'));
+  check('hero 里只剩刷新按钮（没有「显示原生首页」这种中间态）', () =>
+    assert(document.querySelectorAll('.ghw-hero-btns .ghw-btn').length === 1, '按钮数量不对'));
 }
 
 console.log('');
@@ -221,3 +218,4 @@ if (failures) {
   process.exit(1);
 }
 console.log('✓ 全部通过\n');
+

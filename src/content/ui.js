@@ -316,12 +316,6 @@ GHW.ui = (function () {
       h('span', { text: '刷新' })
     );
 
-    var nativeToggle = h(
-      'button',
-      { class: 'ghw-btn ghw-btn-ghost', type: 'button', onclick: function () { ctx.onToggleNative(); } },
-      h('span', { text: settings.hideNative ? '显示 GitHub 原生首页' : '回到工作台' })
-    );
-
     var quickLinks = h(
       'nav',
       { class: 'ghw-quick' },
@@ -623,7 +617,7 @@ GHW.ui = (function () {
         'header',
         { class: 'ghw-hero' },
         h('div', { class: 'ghw-hero-id' }, heroAvatar, h('div', { class: 'ghw-hero-text' }, heroName, h('div', { class: 'ghw-hero-sub' }, heroLogin, heroChips), heroBio)),
-        h('div', { class: 'ghw-hero-actions' }, metaLine, h('div', { class: 'ghw-hero-btns' }, refreshBtn, nativeToggle))
+        h('div', { class: 'ghw-hero-actions' }, metaLine, h('div', { class: 'ghw-hero-btns' }, refreshBtn))
       ),
       quickLinks,
       h('div', { class: 'ghw-grid' }, mainCol, sideCol),
@@ -748,10 +742,6 @@ GHW.ui = (function () {
       setFooter: function (text, stale) {
         metaLine.textContent = text;
         metaLine.classList.toggle('is-stale', !!stale);
-      },
-
-      setNativeVisible: function (visible) {
-        nativeToggle.textContent = visible ? '回到工作台' : '显示 GitHub 原生首页';
       }
     };
 
@@ -760,3 +750,4 @@ GHW.ui = (function () {
 
   return { create: create };
 })();
+

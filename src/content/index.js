@@ -162,13 +162,6 @@
         if (state.app) state.app.setBusy(name);
         loadOne(name, true);
       },
-      onToggleNative: function () {
-        var next = !state.settings.hideNative;
-        STORE.saveSettings({ hideNative: next }).then(function (s) {
-          state.settings = s;
-          applyNativeVisibility();
-        });
-      },
       onSavePicks: function (picks) {
         STORE.saveSettings({ starredPicks: picks }).then(function (s) {
           state.settings = s;
@@ -203,13 +196,11 @@
   }
 
   function applyNativeVisibility() {
-    // 关掉 hideNative 时不是卸载，而是把原生内容露出来放到工作台下面 ——
-    // 这样那个开关永远是双向可逆的，不用再去点扩展图标。
-    var hide = !!state.settings.hideNative;
-    document.documentElement.classList.toggle('ghw-native-hidden', hide);
+    // 工作台挂载着就接管内容区；关掉扩展时 unmount() 会把类名一起清掉
+    var on = !!state.settings.enabled;
+    document.documentElement.classList.toggle('ghw-native-hidden', on);
     // 想更宽的版面时，可以把 GitHub 的左侧导航一起收掉
-    document.documentElement.classList.toggle('ghw-hide-sidebar', hide && !state.settings.keepChrome);
-    if (state.app) state.app.setNativeVisible(!hide);
+    document.documentElement.classList.toggle('ghw-hide-sidebar', on && !state.settings.keepChrome);
   }
 
   function unmount() {
