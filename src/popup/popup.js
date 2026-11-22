@@ -25,6 +25,7 @@
     listLimit: document.getElementById('listLimit'),
     repoCount: document.getElementById('repoCount'),
     clearCache: document.getElementById('clearCache'),
+    resetLayout: document.getElementById('resetLayout'),
     note: document.getElementById('note')
   };
 
@@ -96,6 +97,12 @@
   els.clearCache.addEventListener('click', function () {
     STORE.clearCache().then(function () {
       flash('缓存已清空');
+    });
+  });
+
+  els.resetLayout.addEventListener('click', function () {
+    STORE.saveSettings({ layout: { main: [], side: [] } }).then(function () {
+      flash('布局已重置，刷新 GitHub 首页生效');
     });
   });
 

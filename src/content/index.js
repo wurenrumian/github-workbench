@@ -63,6 +63,7 @@
       function (res) {
         if (!state.mounted || !state.app) return;
         state.app.apply(name, res);
+        if (name === 'starred') prefetchStarredMeta(state.settings.starredPicks);
         if (res.error) {
           state.app.setFooter('部分数据是旧缓存（' + (res.error.message || '抓取失败') + '）', true);
         }
@@ -76,6 +77,22 @@
   }
 
   var pending = 0;
+
+  /** 手动添加的关注项目：仓库元信息没缓存时补拉一次 */
+  function prefetchStarredMeta(picks) {
+    if (!picks || !picks.length || !state.app) return;
+    picks.forEach(function (name) {
+      if (state.app.hasStarred(name)) return;
+      API.repoMeta(name).then(
+        function (meta) {
+          if (state.app) state.app.addStarredMeta(meta);
+        },
+        function () {
+          /* 拉不到就只显示仓库名 */
+        }
+      );
+    });
+  }
 
   function loadAll(opts) {
     opts = opts || {};
@@ -164,6 +181,12 @@
       },
       onSavePicks: function (picks) {
         STORE.saveSettings({ starredPicks: picks }).then(function (s) {
+          state.settings = s;
+        });
+        prefetchStarredMeta(picks);
+      },
+      onLayout: function (layout) {
+        STORE.saveSettings({ layout: layout }).then(function (s) {
           state.settings = s;
         });
       }
@@ -304,6 +327,7 @@
           state.settings &&
           (JSON.stringify(state.settings.panels) !== JSON.stringify(s.panels) ||
             state.settings.keepChrome !== s.keepChrome ||
+            JSON.stringify(state.settings.layout) !== JSON.stringify(s.layout) ||
             Number(state.settings.listLimit) !== Number(s.listLimit) ||
             Number(state.settings.repoCount) !== Number(s.repoCount));
         state.settings = s;

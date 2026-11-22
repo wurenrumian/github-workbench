@@ -172,9 +172,29 @@ GHW.api = (function () {
     return task;
   }
 
+  /** 单个仓库的元信息（手动添加的关注项目用），单独缓存 1 小时 */
+  function repoMeta(fullName) {
+    var key = 'repo:' + fullName;
+    return STORE.cacheGet(key, 60).then(function (hit) {
+      if (hit) return hit.data;
+      return fetchHtml('/' + fullName).then(function (doc) {
+        var meta = P.parseRepoHeader(doc);
+        meta.fullName = fullName;
+        meta.owner = fullName.split('/')[0];
+        meta.name = fullName.split('/')[1];
+        meta.href = '/' + fullName;
+        meta.updated = null;
+        meta.visibility = '';
+        STORE.cacheSet(key, meta);
+        return meta;
+      });
+    });
+  }
+
   return {
     getLogin: getLogin,
     load: load,
+    repoMeta: repoMeta,
     sources: Object.keys(SOURCES)
   };
 })();

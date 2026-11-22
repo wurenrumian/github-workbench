@@ -131,6 +131,76 @@ GHW.parse = (function () {
     return null;
   }
 
+  /** 搜索结果的行容器（新版 /search 的类名带 hash，用前缀匹配） */
+  function searchRow(node) {
+    var el = node;
+    var depth = 0;
+    while (el && depth++ < 6) {
+      var cls = typeof el.className === 'string' ? el.className : '';
+      if (/Result__|Box-row|issues-row/.test(cls)) return el;
+      if (el.tagName === 'LI') return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  function excerptOf(row) {
+    if (!row) return '';
+    var el = row.querySelector('[class*="Content__"], .search-match + div, p');
+    if (!el) return '';
+    var txt = U.textOf(el);
+    return txt.length > 200 ? txt.slice(0, 200) + '…' : txt;
+  }
+
+  function authorOf(row) {
+    if (!row) return '';
+    // 新版搜索结果：footer 里第一个非数字的 li 就是作者（头像的 alt 是空的）
+    var footer = row.querySelector('[class*="footer__"]');
+    if (footer) {
+      var lis = footer.querySelectorAll('li');
+      for (var i = 0; i < lis.length; i++) {
+        var t = U.textOf(lis[i]);
+        if (t && !/^[\d,]+$/.test(t) && !/^#\d+$/.test(t)) return t.replace(/^@/, '');
+      }
+    }
+    var avatar = row.querySelector('img[alt]');
+    if (avatar) {
+      var alt = (avatar.getAttribute('alt') || '').trim();
+      if (alt && alt.length < 40 && !/\s/.test(alt)) return alt.replace(/^@/, '');
+    }
+    var link = row.querySelector('ul a[href^="/"]');
+    if (link) {
+      var href = link.getAttribute('href') || '';
+      var m = /^\/([^\/?#]+)$/.exec(href);
+      if (m) return m[1];
+    }
+    return '';
+  }
+
+  function commentsOf(row) {
+    if (!row) return null;
+    // 新版搜索结果：评论数就是带评论图标的那个 li 里的数字
+    var icon = row.querySelector('.octicon-comment-discussion, [class*="commentIcon"]');
+    var host = icon && icon.closest('li');
+    if (host) {
+      var n = parseInt(U.textOf(host).replace(/[^\d]/g, ''), 10);
+      if (!isNaN(n)) return n;
+    }
+    var m = /(\d[\d,]*)\s+comments?/i.exec(row.textContent || '');
+    return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
+  }
+
+  function openedTextOf(row) {
+    if (!row) return '';
+    var m = /(?:opened|created)\s+([^·|\n]+)/i.exec(row.textContent || '');
+    if (!m) return '';
+    return m[1]
+      .replace(/^on\s+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 24);
+  }
+
   function cleanTitle(text, number) {
     var s = text || '';
     s = s.replace(/^#\d+\s*/, '');
@@ -201,7 +271,7 @@ GHW.parse = (function () {
         continue;
       }
 
-      var row = closestRow(a);
+      var row = searchRow(a) || closestRow(a);
       byHref[href] = {
         type: m[3] === 'pull' ? 'pr' : 'issue',
         owner: m[1],
@@ -212,8 +282,12 @@ GHW.parse = (function () {
         url: 'https://github.com' + href,
         repoFullName: m[1] + '/' + m[2],
         updated: rowTime(row),
+        openedText: openedTextOf(row),
         state: rowState(row),
-        labels: rowLabels(row)
+        labels: rowLabels(row),
+        excerpt: excerptOf(row),
+        author: authorOf(row),
+        comments: commentsOf(row)
       };
     }
 
@@ -423,6 +497,25 @@ GHW.parse = (function () {
     return limit ? out.slice(0, limit) : out;
   }
 
+  /** 单个仓库页的头部信息，用于手动添加的关注项目 */
+  function parseRepoHeader(doc) {
+    var out = { description: '', language: '', languageColor: null, stars: '' };
+
+    var desc = doc.querySelector('[itemprop="description"], .BorderGrid-cell p, p.f4.my-3');
+    if (desc) out.description = U.textOf(desc);
+
+    var lang = doc.querySelector('[itemprop="programmingLanguage"]');
+    if (lang) out.language = U.textOf(lang);
+
+    var colorEl = doc.querySelector('.repo-language-color');
+    if (colorEl) out.languageColor = U.colorFromStyle(colorEl.getAttribute('style'));
+
+    var stars = doc.querySelector('#repo-stars-counter-star, a[href$="/stargazers"] .Counter');
+    if (stars) out.stars = U.textOf(stars).replace(/[^\d.,km]/gi, '');
+
+    return out;
+  }
+
   /** 当前页面顶栏的通知未读数（不用额外发请求） */
   function unreadCountFromPage(doc) {
     var doc2 = doc || document;
@@ -450,6 +543,7 @@ GHW.parse = (function () {
     parsePinned: parsePinned,
     parseRepoList: parseRepoList,
     parseStarredRepos: parseStarredRepos,
+    parseRepoHeader: parseRepoHeader,
     parseNotifications: parseNotifications,
     unreadCountFromPage: unreadCountFromPage
   };

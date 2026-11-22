@@ -181,12 +181,118 @@ console.log('\n[仓库 / 关注的项目]');
     assert(q('[data-panel="starred"] .ghw-pick input:checked').length === 2, '默认勾选数不对'));
   check('挑选后保存回调', () => {
     const boxes = [...q('[data-panel="starred"] .ghw-pick input')];
-    boxes.forEach((b) => (b.checked = b.value === 'o/r4'));
+    boxes.forEach((b) => {
+      if (b.checked && b.value !== 'o/r4') b.click();
+    });
+    const target = boxes.find((b) => b.value === 'o/r4');
+    if (!target.checked) target.click();
     document.querySelector('[data-panel="starred"] .ghw-picker-foot .is-primary').click();
     assert(JSON.stringify(calls.picks) === JSON.stringify(['o/r4']), `回调收到 ${JSON.stringify(calls.picks)}`);
   });
   check('保存后只显示挑中的那个', () =>
     assert(q('[data-panel="starred"] .ghw-repo').length === 1, '筛选没生效'));
+}
+
+console.log('\n[Issue 行的信息量]');
+{
+  app.apply('created', {
+    data: [
+      {
+        type: 'issue',
+        owner: 'a',
+        repo: 'b',
+        number: 7,
+        title: '信息更全的一行',
+        href: '/a/b/issues/7',
+        repoFullName: 'a/b',
+        updated: null,
+        openedText: '2 days ago',
+        state: 'open',
+        labels: [],
+        author: 'someone',
+        comments: 12,
+        excerpt: '这里是正文摘要，应该显示在标题下面'
+      }
+    ]
+  });
+  document.querySelectorAll('[data-panel="issues"] .ghw-tab')[1].click();
+  const row = document.querySelector('[data-panel="issues"] .ghw-tab-pane.is-active .ghw-row');
+  check('显示作者', () => assert(/@someone/.test(row.textContent), row.textContent));
+  check('显示评论数', () => assert(/12 评论/.test(row.textContent), row.textContent));
+  check('英文相对时间转成中文', () => assert(/2 天前/.test(row.textContent), row.textContent));
+  check('显示正文摘要', () => assert(row.querySelector('.ghw-row-excerpt'), '没有摘要'));
+}
+
+console.log('\n[关注的项目 · 手动添加]');
+{
+  app.apply('starred', {
+    data: [
+      { fullName: 'o/r0', href: '/o/r0', description: '', language: 'Go', languageColor: null, stars: '1', updated: null, visibility: '' },
+      { fullName: 'o/r1', href: '/o/r1', description: '', language: 'Go', languageColor: null, stars: '1', updated: null, visibility: '' }
+    ]
+  });
+  document.querySelector('[data-panel="starred"] .ghw-link-btn').click();
+  const input = document.querySelector('[data-panel="starred"] .ghw-pick-input');
+  check('输入框存在', () => assert(!!input, '没有输入框'));
+  check('添加任意仓库', () => {
+    input.value = 'https://github.com/foo/bar/';
+    input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const names = [...document.querySelectorAll('[data-panel="starred"] .ghw-pick-name')].map((n) => n.textContent);
+    assert(names.includes('foo/bar'), names.join(','));
+    assert(!!document.querySelector('[data-panel="starred"] .ghw-pick-tag'), '没有「手动」标记');
+  });
+  check('非法输入会被拒绝', () => {
+    const before = document.querySelectorAll('[data-panel="starred"] .ghw-pick').length;
+    input.value = 'not a repo';
+    input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    assert(document.querySelectorAll('[data-panel="starred"] .ghw-pick').length === before, '非法输入被加进去了');
+    assert(input.classList.contains('is-bad'), '没有错误态');
+  });
+  document.querySelector('[data-panel="starred"] .ghw-picker-foot .ghw-btn').click();
+}
+
+console.log('\n[面板顺序]');
+{
+  const s2 = JSON.parse(JSON.stringify(settings));
+  s2.layout = { main: ['pinned', 'contributions', 'repos', 'starred'], side: ['opened', 'review', 'issues'] };
+  const app2 = GHW.ui.create({
+    login: 'octocat',
+    settings: s2,
+    onRefresh: () => {},
+    onRetry: () => {},
+    onSavePicks: () => {}
+  });
+  document.body.appendChild(app2.el);
+  const mainOrder = [...app2.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
+  const sideOrder = [...app2.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
+  check('主列按保存的顺序渲染', () =>
+    assert(mainOrder.join(',') === 'pinned,contributions,repos,starred', mainOrder.join(',')));
+  check('侧列按保存的顺序渲染', () =>
+    assert(sideOrder.join(',') === 'opened,review,issues', sideOrder.join(',')));
+  app2.el.remove();
+
+  // 跨列拖动：贡献日历被拖到侧列顶部
+  const s3 = JSON.parse(JSON.stringify(settings));
+  s3.layout = {
+    main: ['repos', 'starred', 'pinned'],
+    side: ['contributions', 'issues', 'review', 'opened']
+  };
+  const app3 = GHW.ui.create({
+    login: 'octocat',
+    settings: s3,
+    onRefresh: () => {},
+    onRetry: () => {},
+    onSavePicks: () => {}
+  });
+  document.body.appendChild(app3.el);
+  const m3 = [...app3.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
+  const s3o = [...app3.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
+  check('跨列顺序正确且没有丢面板', () => {
+    assert(m3.join(',') === 'repos,starred,pinned', `main=${m3.join(',')}`);
+    assert(s3o.join(',') === 'contributions,issues,review,opened', `side=${s3o.join(',')}`);
+    assert(m3.length + s3o.length === 7, `总面板数 ${m3.length + s3o.length}`);
+  });
+  app3.el.remove();
 }
 
 console.log('\n[错误与安全]');

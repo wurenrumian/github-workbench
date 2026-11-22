@@ -355,6 +355,54 @@ html.ghw-native-hidden body footer {
   color: var(--ghw-muted);
 }
 
+.ghw-pick-tag {
+  flex: none;
+  padding: 0 5px;
+  border: 1px solid var(--ghw-border);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 15px;
+  color: var(--ghw-muted);
+}
+
+.ghw-picker-empty {
+  padding: 12px 8px;
+  font-size: 12px;
+  color: var(--ghw-muted);
+}
+
+.ghw-picker-add {
+  display: flex;
+  gap: 6px;
+  padding: 8px 4px 0;
+}
+
+.ghw-pick-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ghw-fg);
+  background: var(--ghw-canvas);
+  border: 1px solid var(--ghw-border);
+  border-radius: 6px;
+}
+
+.ghw-pick-input:focus {
+  outline: none;
+  border-color: var(--ghw-accent);
+}
+
+.ghw-pick-input.is-bad {
+  border-color: var(--ghw-danger);
+}
+
+.ghw-picker-add .ghw-btn-sm {
+  margin-top: 0;
+  flex: none;
+}
+
 .ghw-picker-foot {
   display: flex;
   justify-content: flex-end;
@@ -470,6 +518,26 @@ html.ghw-native-hidden body footer {
   color: var(--ghw-muted);
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* 面板拖动排序 */
+.ghw-panel-head {
+  cursor: grab;
+}
+
+.ghw-panel-head:active {
+  cursor: grabbing;
+}
+
+.ghw-panel-head a,
+.ghw-panel-head button {
+  -webkit-user-drag: none;
+  cursor: pointer;
+}
+
+.ghw-panel.is-dragging {
+  opacity: 0.5;
+  border-style: dashed;
 }
 
 .ghw-panel-more:hover {
@@ -594,6 +662,19 @@ html.ghw-native-hidden body footer {
   flex-wrap: wrap;
   font-size: 11px;
   color: var(--ghw-muted);
+}
+
+.ghw-row-excerpt {
+  display: -webkit-box;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ghw-muted);
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  opacity: 0.9;
 }
 
 .ghw-repo-name {

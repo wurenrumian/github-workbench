@@ -190,7 +190,9 @@ GHW.ui = (function () {
 
     var frag = document.createDocumentFragment();
     items.forEach(function (it) {
-      var state = it.state || (it.type === 'pr' ? 'open' : 'open');
+      var state = it.state || 'open';
+      var when = it.updated ? U.relTime(it.updated) : U.relText(it.openedText);
+
       frag.appendChild(
         h(
           'a',
@@ -210,8 +212,11 @@ GHW.ui = (function () {
               { class: 'ghw-row-meta' },
               h('span', { class: 'ghw-repo-name', text: it.repoFullName || it.repo || '' }),
               it.number ? h('span', { class: 'ghw-dim', text: '#' + it.number }) : null,
-              it.updated ? h('span', { class: 'ghw-dim', text: U.relTime(it.updated) }) : null
-            )
+              it.author ? h('span', { class: 'ghw-dim', text: '@' + it.author }) : null,
+              it.comments ? h('span', { class: 'ghw-dim', text: it.comments + ' 评论' }) : null,
+              when ? h('span', { class: 'ghw-dim', text: when }) : null
+            ),
+            it.excerpt ? h('span', { class: 'ghw-row-excerpt', text: it.excerpt }) : null
           ),
           it.labels && it.labels.length
             ? h(
@@ -392,33 +397,91 @@ GHW.ui = (function () {
     };
 
     function buildStarPicker() {
-      var picks = (settings.starredPicks || []).slice();
-      var chosen = {};
-      if (!picks.length) {
-        // 还没手动挑过，就把当前默认显示的这几个勾上
-        pickedStarred().forEach(function (r) {
-          chosen[r.fullName] = 1;
+      // draft 是有序的选中列表，顺序就是面板里的顺序
+      var draft = settings.starredPicks && settings.starredPicks.length
+        ? settings.starredPicks.slice()
+        : pickedStarred().map(function (r) {
+            return r.fullName;
+          });
+
+      var poolNames = starredAll.map(function (r) {
+        return r.fullName;
+      });
+
+      function allNames() {
+        var out = draft.slice();
+        poolNames.forEach(function (n) {
+          if (out.indexOf(n) < 0) out.push(n);
         });
-      } else {
-        picks.forEach(function (n) {
-          chosen[n] = 1;
-        });
+        return out;
       }
 
       var list = h('div', { class: 'ghw-picker' });
-      starredAll.forEach(function (r) {
-        var cb = h('input', { type: 'checkbox' });
-        cb.checked = !!chosen[r.fullName];
-        cb.value = r.fullName;
-        list.appendChild(
-          h(
-            'label',
-            { class: 'ghw-pick' },
-            cb,
-            h('span', { class: 'ghw-pick-name', text: r.fullName }),
-            r.language ? h('span', { class: 'ghw-pick-lang', text: r.language }) : null
-          )
-        );
+
+      function paint() {
+        list.textContent = '';
+        var names = allNames();
+        if (!names.length) {
+          list.appendChild(
+            h('div', { class: 'ghw-picker-empty', text: 'star 列表是空的，可以在下面手动添加仓库' })
+          );
+        }
+        names.forEach(function (n) {
+          var inDraft = draft.indexOf(n) >= 0;
+          var manual = poolNames.indexOf(n) < 0;
+
+          var cb = h('input', { type: 'checkbox', value: n });
+          cb.checked = inDraft;
+          cb.addEventListener('change', function () {
+            if (cb.checked) {
+              if (draft.indexOf(n) < 0) draft.push(n);
+            } else {
+              draft = draft.filter(function (x) {
+                return x !== n;
+              });
+            }
+          });
+
+          list.appendChild(
+            h(
+              'label',
+              { class: 'ghw-pick' },
+              cb,
+              h('span', { class: 'ghw-pick-name', text: n }),
+              manual ? h('span', { class: 'ghw-pick-tag', text: '手动' }) : null
+            )
+          );
+        });
+      }
+      paint();
+
+      var input = h('input', {
+        class: 'ghw-pick-input',
+        type: 'text',
+        placeholder: 'owner/repo，回车添加',
+        spellcheck: 'false'
+      });
+
+      function addTyped() {
+        var v = (input.value || '')
+          .trim()
+          .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
+          .replace(/\/+$/, '');
+        if (!/^[\w.-]+\/[\w.-]+$/.test(v)) {
+          input.classList.add('is-bad');
+          return;
+        }
+        input.classList.remove('is-bad');
+        if (draft.indexOf(v) < 0) draft.push(v);
+        input.value = '';
+        paint();
+      }
+
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addTyped();
+        }
       });
 
       return h(
@@ -429,12 +492,18 @@ GHW.ui = (function () {
           { class: 'ghw-picker-hint' },
           h('span', {
             text:
-              '从最近 star 的 ' +
+              '勾选要显示的（' +
               starredAll.length +
-              ' 个项目里挑（/stars 只渲染第一页，更多的去 Stars 页面管理）'
+              ' 个来自最近 star，可自由增删）'
           })
         ),
         list,
+        h(
+          'div',
+          { class: 'ghw-picker-add' },
+          input,
+          h('button', { class: 'ghw-btn ghw-btn-sm', type: 'button', onclick: addTyped }, '添加')
+        ),
         h(
           'div',
           { class: 'ghw-picker-foot' },
@@ -456,10 +525,7 @@ GHW.ui = (function () {
               class: 'ghw-btn ghw-btn-sm is-primary',
               type: 'button',
               onclick: function () {
-                var names = [];
-                [].forEach.call(list.querySelectorAll('input[type="checkbox"]'), function (cb) {
-                  if (cb.checked) names.push(cb.value);
-                });
+                var names = draft.slice();
                 settings.starredPicks = names;
                 if (ctx.onSavePicks) ctx.onSavePicks(names);
                 starredEditing = false;
@@ -492,7 +558,6 @@ GHW.ui = (function () {
       }
       renderRepos(body, items);
     }
-
     var starEditAction = settings.panels.starred ? starredEditBtn : null;
 
     var contributionsPanel = panel('contributions', '贡献日历', '/' + login, '个人主页');
@@ -600,6 +665,136 @@ GHW.ui = (function () {
       settings.panels.review ? panel('review', '等我评审', LINKS.review) : null,
       settings.panels.opened ? panel('opened', '我开的 PR', LINKS.pulls) : null
     );
+
+    /* --- 面板拖动排序 --- */
+
+    var cols = [
+      { el: mainCol, key: 'main' },
+      { el: sideCol, key: 'side' }
+    ];
+
+    function panelsIn(col) {
+      return [].filter.call(col.children, function (n) {
+        return n.classList && n.classList.contains('ghw-panel');
+      });
+    }
+
+    function applyLayout() {
+      var layout = settings.layout || {};
+      var all = {};
+      cols.forEach(function (c) {
+        panelsIn(c.el).forEach(function (p) {
+          all[p.dataset.panel] = p;
+        });
+      });
+
+      var placed = {};
+      cols.forEach(function (c) {
+        (layout[c.key] || []).forEach(function (n) {
+          if (all[n] && !placed[n]) {
+            c.el.appendChild(all[n]);
+            placed[n] = 1;
+          }
+        });
+      });
+
+      // 没出现在保存顺序里的（新增面板、第一次加载）留在原来的列，保持相对顺序
+      var rest = [];
+      cols.forEach(function (c) {
+        panelsIn(c.el).forEach(function (p) {
+          if (placed[p.dataset.panel]) return;
+          placed[p.dataset.panel] = 1;
+          rest.push({ col: c, el: p });
+        });
+      });
+      rest.forEach(function (r) {
+        r.col.el.appendChild(r.el);
+      });
+    }
+
+    function persistLayout() {
+      var next = { main: [], side: [] };
+      cols.forEach(function (c) {
+        next[c.key] = panelsIn(c.el).map(function (p) {
+          return p.dataset.panel;
+        });
+      });
+      settings.layout = next;
+      if (ctx.onLayout) ctx.onLayout(next);
+    }
+
+    var dragEl = null;
+
+    function insertPoint(col, y) {
+      var list = panelsIn(col).filter(function (p) {
+        return p !== dragEl;
+      });
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i].getBoundingClientRect();
+        if (y < r.top + r.height / 2) return list[i];
+      }
+      return null;
+    }
+
+    function wireDrag() {
+      panelsIn(mainCol)
+        .concat(panelsIn(sideCol))
+        .forEach(function (panel) {
+          var head = panel.querySelector('.ghw-panel-head');
+          if (!head) return;
+
+          // 只在按住头部时才允许拖，否则会影响正文选中文字
+          head.addEventListener('pointerdown', function () {
+            panel.draggable = true;
+          });
+          head.addEventListener('pointerup', function () {
+            panel.draggable = false;
+          });
+
+          panel.addEventListener('dragstart', function (e) {
+            if (!panel.draggable || (e.target.closest && e.target.closest('a, button, input'))) {
+              e.preventDefault();
+              return;
+            }
+            dragEl = panel;
+            panel.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            try {
+              e.dataTransfer.setData('text/plain', panel.dataset.panel || '');
+            } catch (err) {
+              /* 某些浏览器不许写 dataTransfer，无所谓 */
+            }
+          });
+
+          panel.addEventListener('dragend', function () {
+            panel.draggable = false;
+            panel.classList.remove('is-dragging');
+            dragEl = null;
+            persistLayout();
+          });
+        });
+
+      cols.forEach(function (c) {
+        c.el.addEventListener('dragover', function (e) {
+          if (!dragEl) return;
+          e.preventDefault();
+          try {
+            e.dataTransfer.dropEffect = 'move';
+          } catch (err) {
+            /* noop */
+          }
+          var after = insertPoint(c.el, e.clientY);
+          if (after === null) c.el.appendChild(dragEl);
+          else if (after !== dragEl) c.el.insertBefore(dragEl, after);
+        });
+        c.el.addEventListener('drop', function (e) {
+          e.preventDefault();
+        });
+      });
+    }
+
+    applyLayout();
+    wireDrag();
 
     var metaLine = h('div', { class: 'ghw-meta-line' });
     var footer = h(
@@ -739,6 +934,20 @@ GHW.ui = (function () {
         app.setCount(name, items.length);
       },
 
+      hasStarred: function (fullName) {
+        return starredAll.some(function (r) {
+          return r.fullName === fullName;
+        });
+      },
+
+      /** 手动添加的仓库拉到元信息后补进来 */
+      addStarredMeta: function (meta) {
+        if (!meta || !meta.fullName) return;
+        if (app.hasStarred(meta.fullName)) return;
+        starredAll.push(meta);
+        renderStarred();
+      },
+
       setFooter: function (text, stale) {
         metaLine.textContent = text;
         metaLine.classList.toggle('is-stale', !!stale);
@@ -750,4 +959,5 @@ GHW.ui = (function () {
 
   return { create: create };
 })();
+
 

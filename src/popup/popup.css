@@ -204,6 +204,10 @@ select {
   padding: 12px 0 8px;
 }
 
+.actions-sub {
+  padding: 0 0 10px;
+}
+
 .btn {
   flex: 1;
   display: inline-flex;

@@ -341,15 +341,15 @@
 
         app.apply('assigned', {
           data: [
-            { type: 'issue', number: 1284, title: '虚拟列表滚动到底部时偶发白屏', href: '/acme/web/issues/1284', repoFullName: 'acme/web', updated: '2026-11-21T09:00:00Z', state: 'open', labels: ['bug', 'P1'] },
-            { type: 'issue', number: 77, title: 'Support streaming responses in the SDK', href: '/acme/sdk/issues/77', repoFullName: 'acme/sdk', updated: '2026-11-20T15:20:00Z', state: 'open', labels: ['enhancement'] },
+            { type: 'issue', number: 1284, title: '虚拟列表滚动到底部时偶发白屏', href: '/acme/web/issues/1284', repoFullName: 'acme/web', updated: '2026-11-21T09:00:00Z', state: 'open', labels: ['bug', 'P1'], author: 'kai', comments: 6, excerpt: '在 Safari 上滚到第 2000 条左右会白屏，怀疑是 recycle 时 key 复用导致的。' },
+            { type: 'issue', number: 77, title: 'Support streaming responses in the SDK', href: '/acme/sdk/issues/77', repoFullName: 'acme/sdk', updated: '2026-11-20T15:20:00Z', state: 'open', labels: ['enhancement'], author: 'lin', comments: 2, excerpt: 'Currently the client buffers the whole body. A stream() helper would unblock the CLI use case.' },
             { type: 'issue', number: 9, title: 'CI 在 Windows runner 上超时', href: '/acme/infra/issues/9', repoFullName: 'acme/infra', updated: '2026-11-18T02:10:00Z', state: 'open', labels: [] }
           ]
         });
 
         app.apply('created', {
           data: [
-            { type: 'issue', number: 1301, title: '给首页加一个自己的面板', href: '/acme/web/issues/1301', repoFullName: 'acme/web', updated: '2026-11-22T03:00:00Z', state: 'open', labels: ['enhancement'] },
+            { type: 'issue', number: 1301, title: '给首页加一个自己的面板', href: '/acme/web/issues/1301', repoFullName: 'acme/web', updated: '2026-11-22T03:00:00Z', state: 'open', labels: ['enhancement'], author: 'octocat', comments: 4, excerpt: '现在的首页信息密度太低，想自己拼一块出来。' },
             { type: 'issue', number: 61, title: '文档里的锚点链接全部失效', href: '/acme/docs/issues/61', repoFullName: 'acme/docs', updated: '2026-11-15T06:00:00Z', state: 'open', labels: ['docs'] }
           ]
         });
@@ -390,6 +390,7 @@
     </script>
   </body>
 </html>
+
 
 
 

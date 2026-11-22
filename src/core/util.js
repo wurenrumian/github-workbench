@@ -104,6 +104,24 @@ GHW.util = (function () {
     return out;
   }
 
+  /** 把 GitHub 的英文相对时间（opened 2 days ago）转成中文 */
+  var REL_UNITS = {
+    second: '秒',
+    minute: '分钟',
+    hour: '小时',
+    day: '天',
+    week: '周',
+    month: '个月',
+    year: '年'
+  };
+
+  function relText(text) {
+    if (!text) return '';
+    var m = /(\d+)\s*(second|minute|hour|day|week|month|year)s?\s*ago/i.exec(text);
+    if (!m) return text;
+    return m[1] + ' ' + REL_UNITS[m[2].toLowerCase()] + '前';
+  }
+
   /** 安全取文本并压掉多余空白 */
   function textOf(node) {
     if (!node) return '';
@@ -122,6 +140,7 @@ GHW.util = (function () {
     append: append,
     fmtNum: fmtNum,
     relTime: relTime,
+    relText: relText,
     dayKey: dayKey,
     addDays: addDays,
     chunk: chunk,

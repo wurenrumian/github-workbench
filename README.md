@@ -42,11 +42,21 @@
 | Issues（指派给我 / 我创建的） | `/search?q=is:issue+…+assignee/@author:@me&type=issues` |
 | 等我评审 | `/search?q=is:pr+is:open+review-requested:@me&type=pullrequests` |
 | 我开的 PR | `/search?q=is:pr+is:open+author:@me&type=pullrequests` |
-| 关注的项目 | `/stars`（面板里点「编辑」可手动挑要显示哪几个） |
+| 关注的项目 | `/stars`（面板里点「编辑」可勾选，也能手动填 `owner/repo` 加任意仓库） |
 | 最近更新 | `/<you>?tab=repositories&sort=updated` |
 | 置顶 / 个人信息 | `/<you>` |
 
 贡献日历不是截图式的装饰：它从页面的 `<tool-tip>` 里读回每天的精确次数，所以「今日 / 本周 / 连续 / 最长」都是算出来的，不是猜的。
+
+issue / PR 的每一行都会带上：仓库 `#编号`、作者、评论数、更新时间（或 opened 时间），以及正文摘要（两行截断）——这些都从搜索结果的 footer / Content 区块里抠出来。
+
+### 布局
+
+面板可以拖动排序：按住卡片标题栏拖到任意位置（跨左右两列也行），顺序会存进 `chrome.storage`，下次打开还是你排的样子。
+
+拖乱了就去弹窗点「重置面板布局」。
+
+「关注的项目」点「编辑」可以勾选要显示哪几个；GitHub 的 `/stars` 只服务端渲染最近 10 个，所以还提供了一个输入框，直接填 `owner/repo` 就能加任意仓库（会顺手抓一下该仓库的描述和语言）。
 
 ### 为什么 issue 列表走 `/search`
 
@@ -152,7 +162,8 @@ npm test
 
 - 只用 GitHub 的**网页结构**，不是官方 API，所以有改版风险（上面写了怎么修）。
 - 没有通知面板：`/notifications` 是纯客户端渲染，拿不到数据。
-- 「关注的项目」用的是 star 列表；GitHub 的 watch 列表（`/watching`）同样拿不到。
+- 「关注的项目」的候选池只有 `/stars` 首屏那 10 个（分页已改成客户端），更多的用输入框手动加。
+- 面板拖动依赖 HTML5 拖放，只支持鼠标，没有做键盘排序。
 - 首页之外的页面什么都不做，不会注入任何 UI。
 - 每次刷新最多发 6 个同源请求（都有缓存，默认 10 分钟）。嫌多可以把面板关掉，关掉的面板不会发请求。
 - 企业版 / GitHub Enterprise 的自托管域名没有适配（改 `manifest.json` 的 `matches` 即可）。
