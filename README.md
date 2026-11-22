@@ -118,6 +118,7 @@ src/core/util.js         DOM helper、数字/时间格式化
 src/core/store.js        设置 + 缓存（chrome.storage.local）
 src/core/parse.js        HTML → 结构化数据（所有兜底逻辑都在这）
 src/core/api.js          同源抓取 + 缓存策略
+src/content/icons.js     octicon 数据（issue / PR / 评论图标）
 src/content/ui.js        工作台渲染
 src/content/index.js     路由监听、挂载/卸载、生命周期
 src/content/styles.css   样式（走 GitHub 的 CSS 变量）

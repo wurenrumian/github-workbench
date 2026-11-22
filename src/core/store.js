@@ -15,7 +15,7 @@ GHW.store = (function () {
 
   var SETTINGS_KEY = 'ghw:settings';
   // 解析结果改结构时升版本号，让旧缓存自动作废
-  var CACHE_PREFIX = 'ghw:cache:v2:';
+  var CACHE_PREFIX = 'ghw:cache:v3:';
 
   var DEFAULTS = {
     // 总开关：开 = 接管内容区，关 = 完全不介入（没有「半接管」这种中间状态）
@@ -172,3 +172,4 @@ GHW.store = (function () {
     clearCache: clearCache
   };
 })();
+

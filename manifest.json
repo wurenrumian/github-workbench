@@ -31,6 +31,7 @@
         "src/core/store.js",
         "src/core/parse.js",
         "src/core/api.js",
+        "src/content/icons.js",
         "src/content/ui.js",
         "src/content/index.js"
       ],
@@ -39,3 +40,4 @@
     }
   ]
 }
+

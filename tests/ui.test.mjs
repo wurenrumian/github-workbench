@@ -36,6 +36,7 @@ const { window } = dom;
 for (const f of ['util.js', 'store.js', 'parse.js']) {
   window.eval(fs.readFileSync(path.join(root, 'src/core', f), 'utf8'));
 }
+window.eval(fs.readFileSync(path.join(root, 'src/content/icons.js'), 'utf8'));
 window.eval(fs.readFileSync(path.join(root, 'src/content/ui.js'), 'utf8'));
 
 const { document } = window;
@@ -141,7 +142,7 @@ console.log('\n[Issues 双 tab]');
   check('点击「我创建的」切换 tab', () => {
     tabs[1].click();
     const active = document.querySelector('.ghw-tab-pane.is-active');
-    assert(active.querySelector('.ghw-row-title').textContent.includes('我创建的'), '切换后内容不对');
+    assert(active.querySelector('.ghw-row-title-text').textContent.includes('我创建的'), '切换后内容不对');
   });
   check('切换后「全部」链接跟着变', () =>
     assert(/author%3A%40me/.test(document.querySelector('[data-panel="issues"] .ghw-panel-more').getAttribute('href')), '链接没跟着切'));
@@ -217,9 +218,16 @@ console.log('\n[Issue 行的信息量]');
   });
   document.querySelectorAll('[data-panel="issues"] .ghw-tab')[1].click();
   const row = document.querySelector('[data-panel="issues"] .ghw-tab-pane.is-active .ghw-row');
-  check('显示作者', () => assert(/@someone/.test(row.textContent), row.textContent));
-  check('显示评论数', () => assert(/12 评论/.test(row.textContent), row.textContent));
+  check('仓库名单独一行', () =>
+    assert(row.querySelector('.ghw-row-repo').textContent === 'a/b', row.querySelector('.ghw-row-repo').textContent));
+  check('显示作者', () => assert(/someone/.test(row.querySelector('.ghw-row-foot').textContent), row.textContent));
+  check('评论数带图标的显示', () => {
+    const comment = row.querySelector('.ghw-foot-item--icon');
+    assert(comment && comment.textContent.trim() === '12', row.textContent);
+    assert(comment.querySelector('svg'), '没有评论图标');
+  });
   check('英文相对时间转成中文', () => assert(/2 天前/.test(row.textContent), row.textContent));
+  check('显示编号', () => assert(/#7/.test(row.textContent), row.textContent));
   check('显示正文摘要', () => assert(row.querySelector('.ghw-row-excerpt'), '没有摘要'));
 }
 
@@ -324,4 +332,5 @@ if (failures) {
   process.exit(1);
 }
 console.log('✓ 全部通过\n');
+
 

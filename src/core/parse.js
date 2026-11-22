@@ -190,6 +190,17 @@ GHW.parse = (function () {
     return m ? parseInt(m[1].replace(/,/g, ''), 10) : null;
   }
 
+  /** 作者头像（官方列表里作者前面有个小头像） */
+  function avatarOf(row) {
+    if (!row) return '';
+    var footer = row.querySelector('[class*="footer__"]');
+    var img = (footer && footer.querySelector('img[src]')) || null;
+    if (!img) return '';
+    var src = img.getAttribute('src') || '';
+    // 缩到 40px，省流量
+    return src.replace(/[?&]s=\d+/, '?s=40').replace(/[?&]size=\d+/, '?size=40');
+  }
+
   function openedTextOf(row) {
     if (!row) return '';
     var m = /(?:opened|created)\s+([^·|\n]+)/i.exec(row.textContent || '');
@@ -287,6 +298,7 @@ GHW.parse = (function () {
         labels: rowLabels(row),
         excerpt: excerptOf(row),
         author: authorOf(row),
+        avatar: avatarOf(row),
         comments: commentsOf(row)
       };
     }

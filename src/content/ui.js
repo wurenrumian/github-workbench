@@ -17,6 +17,19 @@ GHW.ui = (function () {
 
   var MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
+  /** 类型 + 状态 → 图标名和颜色，语义跟 GitHub 一致 */
+  function stateMeta(it) {
+    var state = it.state || 'open';
+    if (it.type === 'pr') {
+      if (state === 'merged') return { name: 'git-merge', cls: 'is-merged' };
+      if (state === 'closed') return { name: 'git-pull-request-closed', cls: 'is-closed' };
+      if (state === 'draft') return { name: 'git-pull-request', cls: 'is-draft' };
+      return { name: 'git-pull-request', cls: 'is-open' };
+    }
+    if (state === 'closed') return { name: 'issue-closed', cls: 'is-done' };
+    return { name: 'circle-dot', cls: 'is-open' };
+  }
+
   var LINKS = {
     assigned: '/issues/assigned',
     review: '/pulls/review-requested',
@@ -190,33 +203,39 @@ GHW.ui = (function () {
 
     var frag = document.createDocumentFragment();
     items.forEach(function (it) {
-      var state = it.state || 'open';
+      var meta = stateMeta(it);
       var when = it.updated ? U.relTime(it.updated) : U.relText(it.openedText);
+
+      // 对齐方式：图标独占一列，正文（仓库 / 标题 / 摘要 / 页脚）整体左对齐
+      var foot = [];
+      if (it.author) foot.push(h('span', { class: 'ghw-foot-item', text: it.author }));
+      if (it.comments) {
+        foot.push(
+          h('span', { class: 'ghw-foot-item ghw-foot-item--icon' }, GHW.icons.make('comment-discussion', 'ghw-ico-sm'), h('span', { text: String(it.comments) }))
+        );
+      }
+      if (when) foot.push(h('span', { class: 'ghw-foot-item', text: when }));
+      if (it.number) foot.push(h('span', { class: 'ghw-foot-item', text: '#' + it.number }));
 
       frag.appendChild(
         h(
           'a',
           { class: 'ghw-row', href: abs(it.href), title: it.title },
-          h('span', { class: 'ghw-state ghw-state--' + state, 'aria-hidden': 'true' }),
+          h('span', { class: 'ghw-row-icon', 'aria-hidden': 'true' }, GHW.icons.make(meta.name, meta.cls)),
           h(
             'span',
             { class: 'ghw-row-body' },
-            h(
-              'span',
-              { class: 'ghw-row-title' },
-              it.type === 'pr' ? h('span', { class: 'ghw-kind', text: 'PR' }) : null,
-              h('span', { text: it.title })
-            ),
-            h(
-              'span',
-              { class: 'ghw-row-meta' },
-              h('span', { class: 'ghw-repo-name', text: it.repoFullName || it.repo || '' }),
-              it.number ? h('span', { class: 'ghw-dim', text: '#' + it.number }) : null,
-              it.author ? h('span', { class: 'ghw-dim', text: '@' + it.author }) : null,
-              it.comments ? h('span', { class: 'ghw-dim', text: it.comments + ' 评论' }) : null,
-              when ? h('span', { class: 'ghw-dim', text: when }) : null
-            ),
-            it.excerpt ? h('span', { class: 'ghw-row-excerpt', text: it.excerpt }) : null
+            h('span', { class: 'ghw-row-repo', text: it.repoFullName || it.repo || '' }),
+            h('span', { class: 'ghw-row-title-text', text: it.title }),
+            it.excerpt ? h('span', { class: 'ghw-row-excerpt', text: it.excerpt }) : null,
+            foot.length
+              ? h(
+                  'span',
+                  { class: 'ghw-row-foot' },
+                  it.avatar ? h('img', { class: 'ghw-mini-avatar', src: it.avatar, alt: '', loading: 'lazy' }) : null,
+                  foot
+                )
+              : null
           ),
           it.labels && it.labels.length
             ? h(
@@ -959,5 +978,6 @@ GHW.ui = (function () {
 
   return { create: create };
 })();
+
 
 
