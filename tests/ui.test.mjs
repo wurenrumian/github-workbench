@@ -61,12 +61,14 @@ const settings = {
 };
 
 const calls = [];
+calls.picks = [];
 const app = GHW.ui.create({
   login: 'octocat',
   settings,
   onRefresh: () => calls.push('refresh'),
   onRetry: (n) => calls.push('retry:' + n),
-  onToggleNative: () => calls.push('toggle')
+  onToggleNative: () => calls.push('toggle'),
+  onSavePicks: (picks) => (calls.picks = picks)
 });
 document.body.appendChild(app.el);
 
@@ -172,6 +174,21 @@ console.log('\n[仓库 / 关注的项目]');
   app.apply('starred', { data: repos });
   check('关注的项目受 starredCount 限制', () =>
     assert(q('[data-panel="starred"] .ghw-repo').length === 2, `实际 ${q('[data-panel="starred"] .ghw-repo').length}`));
+
+  check('点「编辑」进入挑选模式', () => {
+    document.querySelector('[data-panel="starred"] .ghw-link-btn').click();
+    assert(q('[data-panel="starred"] .ghw-pick').length === 6, `选项数 ${q('[data-panel="starred"] .ghw-pick').length}`);
+  });
+  check('默认勾选当前显示的那几个', () =>
+    assert(q('[data-panel="starred"] .ghw-pick input:checked').length === 2, '默认勾选数不对'));
+  check('挑选后保存回调', () => {
+    const boxes = [...q('[data-panel="starred"] .ghw-pick input')];
+    boxes.forEach((b) => (b.checked = b.value === 'o/r4'));
+    document.querySelector('[data-panel="starred"] .ghw-picker-foot .is-primary').click();
+    assert(JSON.stringify(calls.picks) === JSON.stringify(['o/r4']), `回调收到 ${JSON.stringify(calls.picks)}`);
+  });
+  check('保存后只显示挑中的那个', () =>
+    assert(q('[data-panel="starred"] .ghw-repo').length === 1, '筛选没生效'));
 }
 
 console.log('\n[错误与安全]');

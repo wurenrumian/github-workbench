@@ -42,7 +42,7 @@
 | Issues（指派给我 / 我创建的） | `/search?q=is:issue+…+assignee/@author:@me&type=issues` |
 | 等我评审 | `/search?q=is:pr+is:open+review-requested:@me&type=pullrequests` |
 | 我开的 PR | `/search?q=is:pr+is:open+author:@me&type=pullrequests` |
-| 关注的项目 | `/stars` |
+| 关注的项目 | `/stars`（面板里点「编辑」可手动挑要显示哪几个） |
 | 最近更新 | `/<you>?tab=repositories&sort=updated` |
 | 置顶 / 个人信息 | `/<you>` |
 
@@ -74,6 +74,7 @@ Chrome / Edge：
 - 总开关、是否接管首页
 - 是否保留左侧原生导航栏
 - 每个面板单独开关
+- 「关注的项目」在面板里点「编辑」就能挑，选择存在本地
 - 缓存有效期（2 分钟 ~ 1 小时）、列表条数
 - 清缓存
 

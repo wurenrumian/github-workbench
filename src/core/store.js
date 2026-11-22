@@ -28,8 +28,10 @@ GHW.store = (function () {
     listLimit: 8,
     // 最近更新仓库显示多少个
     repoCount: 8,
-    // 关注的项目显示多少个
+    // 关注的项目显示多少个（没手动挑选时）
     starredCount: 6,
+    // 手动挑选要显示的关注项目（["owner/name", ...]，空数组 = 用上面那个默认数量）
+    starredPicks: [],
     panels: {
       contributions: true,
       issues: true,

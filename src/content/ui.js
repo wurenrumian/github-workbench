@@ -340,7 +340,7 @@ GHW.ui = (function () {
 
     /* --- 面板工厂 --- */
 
-    function panel(name, title, href, moreText) {
+    function panel(name, title, href, moreText, extraActions) {
       var count = h('span', { class: 'ghw-count is-hidden' });
       var body = h('div', { class: 'ghw-panel-body' }, skeletonRows(3));
       bodyEls[name] = body;
@@ -352,13 +352,154 @@ GHW.ui = (function () {
           'header',
           { class: 'ghw-panel-head' },
           h('h2', { class: 'ghw-panel-title' }, h('span', { text: title }), count),
-          href ? h('a', { class: 'ghw-panel-more', href: abs(href), text: moreText || '全部' }) : null
+          h(
+            'div',
+            { class: 'ghw-panel-actions' },
+            extraActions || null,
+            href ? h('a', { class: 'ghw-panel-more', href: abs(href), text: moreText || '全部' }) : null
+          )
         ),
         body
       );
       sections[name] = { section: section, count: count, body: body };
       return section;
     }
+
+    /* --- 关注的项目：可编辑，从 star 列表里挑 --- */
+
+    var starredAll = [];
+    var starredEditing = false;
+
+    var starredEditBtn = h(
+      'button',
+      {
+        class: 'ghw-link-btn',
+        type: 'button',
+        onclick: function () {
+          starredEditing = !starredEditing;
+          renderStarred();
+        }
+      },
+      '编辑'
+    );
+
+    var pickedStarred = function () {
+      var picks = settings.starredPicks || [];
+      if (!picks.length) return starredAll.slice(0, settings.starredCount || 6);
+      var byName = {};
+      starredAll.forEach(function (r) {
+        byName[r.fullName] = r;
+      });
+      return picks
+        .map(function (n) {
+          return byName[n];
+        })
+        .filter(Boolean);
+    };
+
+    function buildStarPicker() {
+      var picks = (settings.starredPicks || []).slice();
+      var chosen = {};
+      if (!picks.length) {
+        // 还没手动挑过，就把当前默认显示的这几个勾上
+        pickedStarred().forEach(function (r) {
+          chosen[r.fullName] = 1;
+        });
+      } else {
+        picks.forEach(function (n) {
+          chosen[n] = 1;
+        });
+      }
+
+      var list = h('div', { class: 'ghw-picker' });
+      starredAll.forEach(function (r) {
+        var cb = h('input', { type: 'checkbox' });
+        cb.checked = !!chosen[r.fullName];
+        cb.value = r.fullName;
+        list.appendChild(
+          h(
+            'label',
+            { class: 'ghw-pick' },
+            cb,
+            h('span', { class: 'ghw-pick-name', text: r.fullName }),
+            r.language ? h('span', { class: 'ghw-pick-lang', text: r.language }) : null
+          )
+        );
+      });
+
+      return h(
+        'div',
+        { class: 'ghw-picker-wrap' },
+        h(
+          'div',
+          { class: 'ghw-picker-hint' },
+          h('span', {
+            text:
+              '从最近 star 的 ' +
+              starredAll.length +
+              ' 个项目里挑（/stars 只渲染第一页，更多的去 Stars 页面管理）'
+          })
+        ),
+        list,
+        h(
+          'div',
+          { class: 'ghw-picker-foot' },
+          h(
+            'button',
+            {
+              class: 'ghw-btn ghw-btn-sm',
+              type: 'button',
+              onclick: function () {
+                starredEditing = false;
+                renderStarred();
+              }
+            },
+            '取消'
+          ),
+          h(
+            'button',
+            {
+              class: 'ghw-btn ghw-btn-sm is-primary',
+              type: 'button',
+              onclick: function () {
+                var names = [];
+                [].forEach.call(list.querySelectorAll('input[type="checkbox"]'), function (cb) {
+                  if (cb.checked) names.push(cb.value);
+                });
+                settings.starredPicks = names;
+                if (ctx.onSavePicks) ctx.onSavePicks(names);
+                starredEditing = false;
+                renderStarred();
+              }
+            },
+            '保存'
+          )
+        )
+      );
+    }
+
+    function renderStarred() {
+      var body = bodyEls.starred;
+      if (!body) return;
+      if (starredEditing && !starredAll.length) starredEditing = false;
+
+      starredEditBtn.textContent = starredEditing ? '完成' : '编辑';
+      starredEditBtn.classList.toggle('is-active', starredEditing);
+
+      body.textContent = '';
+      if (starredEditing) {
+        body.appendChild(buildStarPicker());
+        return;
+      }
+      var items = pickedStarred();
+      if (!items.length) {
+        body.appendChild(emptyState('还没有 star 过项目', '在 GitHub 上 star 之后，这里可以直接挑选显示哪些'));
+        return;
+      }
+      renderRepos(body, items);
+    }
+
+    var starEditAction = settings.panels.starred ? starredEditBtn : null;
 
     var contributionsPanel = panel('contributions', '贡献日历', '/' + login, '个人主页');
 
@@ -454,7 +595,7 @@ GHW.ui = (function () {
       settings.panels.repos
         ? panel('repos', '最近更新', '/' + login + '?tab=repositories&sort=updated', '全部仓库')
         : null,
-      settings.panels.starred ? panel('starred', '关注的项目', LINKS.stars, '全部') : null,
+      settings.panels.starred ? panel('starred', '关注的项目', LINKS.stars, '全部', starEditAction) : null,
       settings.panels.pinned ? panel('pinned', '置顶', '/' + login, '个人主页') : null
     );
 
@@ -582,7 +723,8 @@ GHW.ui = (function () {
         }
 
         if (name === 'starred') {
-          renderRepos(body, (data || []).slice(0, settings.starredCount || 6));
+          starredAll = data || [];
+          renderStarred();
           app.setCount(name, null);
           return;
         }

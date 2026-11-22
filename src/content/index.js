@@ -168,6 +168,11 @@
           state.settings = s;
           applyNativeVisibility();
         });
+      },
+      onSavePicks: function (picks) {
+        STORE.saveSettings({ starredPicks: picks }).then(function (s) {
+          state.settings = s;
+        });
       }
     });
 

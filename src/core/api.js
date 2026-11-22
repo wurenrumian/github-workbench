@@ -117,7 +117,7 @@ GHW.api = (function () {
     // 关注的项目：/watching 是空壳，/stars 还是老的 SSR 列表
     starred: function () {
       return fetchHtml('/stars?tab=stars').then(function (doc) {
-        return P.parseStarredRepos(doc, 20);
+        return P.parseStarredRepos(doc, 60);
       });
     },
 
