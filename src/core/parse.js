@@ -620,8 +620,12 @@ GHW.parse = (function () {
     var lang = box.querySelector('[aria-label$=" language"]');
     if (lang) out.language = U.textOf(lang);
 
-    var circle = box.querySelector('[class*="languageCircle"]');
-    if (circle) out.languageColor = U.colorFromStyle(circle.getAttribute('style'));
+    // 颜色在 languageCircle 的子节点上，外层 wrapper 不带 style，不能直接取第一个
+    var circles = box.querySelectorAll('[class*="languageCircle"]');
+    for (var c = 0; c < circles.length; c++) {
+      out.languageColor = U.colorFromStyle(circles[c].getAttribute('style'));
+      if (out.languageColor) break;
+    }
 
     out.stars = countText(box.querySelector('a[href$="/stargazers"]'));
     out.forks = countText(box.querySelector('a[href$="/forks"]'));

@@ -187,8 +187,8 @@ console.log('\n[仓库搜索结果]');
       <div class="Content__agXLbn">把 GitHub 首页换成工作台</div>
       <div class="tokenList__w65Lup"><a href="/topics/github">github</a></div>
       <ul class="footer__evnOBN">
-        <li><span aria-label="JavaScript language">JavaScript</span>
-            <div class="languageCircle__eF82_7" style="background-color:#f1e05a"></div></li>
+        <li><span class="languageCircleWrapper__VOT6Am"><div class="languageCircle__eF82_7" style="background-color:#f1e05a"></div></span>
+            <span aria-label="JavaScript language">JavaScript</span></li>
         <li><a href="/wurenrumian/github-workbench/stargazers"><span>13,149</span></a></li>
         <li><span>Updated <div title="Nov 22, 2026, 8:57 AM UTC"><span title="Nov 22, 2026, 8:57 AM UTC">7 minutes ago</span></div></span></li>
       </ul>
