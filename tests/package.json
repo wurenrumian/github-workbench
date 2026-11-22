@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node parse.test.mjs && node ui.test.mjs"
+    "test": "node parse.test.mjs && node ui.test.mjs && node boot.test.mjs"
   },
   "keywords": [],
   "type": "module",

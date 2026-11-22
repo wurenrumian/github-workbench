@@ -16,6 +16,7 @@
 
 - **零配置**：不需要 Personal Access Token，直接用浏览器里已有的 GitHub 登录态发同源请求。
 - **可逆**：弹窗里关掉总开关就完全恢复原生首页，不用卸载扩展；不会出现「工作台和原生流叠在一起」的畸形状态。
+- **不闪原生首页**：`document_start` 就先盖住页面，挂载完成后才露出工作台，中间不会闪一下 GitHub 原生 feed。
 - **跟着主题走**：颜色全部用 GitHub 自己的 CSS 变量，浅色 / 暗色 / 第三方主题自动适配。
 - **数据不出浏览器**：所有请求只发往 `github.com`，结果存在本地 `chrome.storage`。
 - **为改版留后手**：解析靠「链接形状 + 相对时间 + class 前缀」这类结构性特征，配了 jsdom 回归测试；哪个入口没了 SSR，见 [docs/data-sources.md](docs/data-sources.md)。
@@ -87,8 +88,14 @@ Chrome / Edge：
 ```
 github.com 首页加载
    │
+   ├─ boot.js   document_start：只要是首页就先把 .ghw-booting 盖上，
+   │             用 boot.css 整屏盖住（背景 + spinner）；DOMContentLoaded 时
+   │             看 <meta name="user-login">，没登录就立刻撤。另外任何一个
+   │             「不接管」的出口都会撤掉它，还有 4 秒超时兜底
+   │
    ├─ index.js   只接管 / 和 /dashboard；从 main 往上找到 .feed-background
-   │             的直接子节点，工作台插在同级，给原内容打 .ghw-native-pane 藏掉
+   │             的直接子节点，工作台插在同级，给原内容打 .ghw-native-pane 藏掉，
+   │             然后撤掉遮罩 —— 用户看到的是「spinner → 工作台」，中间不露原生首页
    │
    ├─ api.js     同源 fetch（带 cookie），按数据源分开发请求、带 TTL 缓存；
    │             某个源失败不影响其它面板，失败时优先用旧缓存
@@ -104,6 +111,8 @@ github.com 首页加载
    └─ ui.js      纯 DOM 构造（一律 textContent，不拼 innerHTML），icons.js 提供 octicon
 ```
 
+**为什么不会先闪原生页面**：DOM 内容要等解析完才能替换，所以「替换」这个动作本身注定晚于首帧；能控制的是**让原生内容在首帧就不可见**。遮罩由 `document_start` 的独立入口注入，赶在 GitHub 画出第一帧之前生效；工作台渲染的是骨架屏，数据异步填。遮罩只在「首页 + 已登录 + 总开关打开」时出现，并且 4 秒后无论挂载成功与否都会自动撤掉——宁可闪一下，不能白屏。
+
 挂载点做了容错：`insertBefore` 前先校验父子关系，否则退回 `appendChild`。这个坑踩过一次——`main` 埋在四层里，直接 `insertBefore` 会抛 `NotFoundError`，表现是「页面看起来完全没变化」。
 
 ## 目录
@@ -115,6 +124,8 @@ src/core/store.js        设置 + 缓存（chrome.storage.local）
 src/core/parse.js        HTML → 结构化数据（所有兜底逻辑都在这）
 src/core/api.js          同源抓取、数据源表、缓存策略
 src/content/icons.js     octicon 路径
+src/content/boot.js      document_start 的首帧遮罩（不闪原生首页）
+src/content/boot.css     遮罩样式，和 boot.js 一起在 document_start 注入
 src/content/ui.js        工作台渲染、面板 / 卡片拖拽
 src/content/index.js     路由监听、挂载 / 卸载、生命周期
 src/content/styles.css   样式（走 GitHub 的 CSS 变量）
@@ -146,6 +157,7 @@ npm test
 
 - `parse.test.mjs`：拿真实抓下来的 contributions / repositories 页面 + 手写的 issue、通知、仓库页、仓库搜索 fixture，验证解析和统计。
 - `ui.test.mjs`：在 jsdom 里把面板渲染一遍，确认不炸、条目数对、Issues 两个 tab 能切、拖动排序能落盘、用户可控文本不会被当 HTML 执行。
+- `boot.test.mjs`：验证首帧遮罩只在「首页 + 已登录」时出现，Turbo 站内跳转按目标地址盖 / 撤，未登录不遮营销首页。
 
 ## 当 GitHub 又改版了
 

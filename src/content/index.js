@@ -19,6 +19,15 @@
   var ROOT_ID = 'ghw-root';
   var HOME = { '/': 1, '/dashboard': 1 };
 
+  // boot.js 在 document_start 盖了一层整屏遮罩，任何「这次不接管」的路径
+  // 都要把它撤掉，否则用户会对着 spinner 发呆（boot.js 自己还有 4s 超时兜底）
+  function revealBoot(reason) {
+    if (GHW.boot && GHW.boot.reveal) GHW.boot.reveal(reason);
+  }
+
+  // 刚进页面时 main / 登录 meta 可能还没出来，短时间重试几次再放弃
+  var mountTries = 0;
+
   var state = {
     settings: null,
     app: null,
@@ -178,6 +187,10 @@
     var login = API.getLogin();
     if (!login) return; // 没登录就不接管首页
 
+    // 首页内容可能是客户端渲染的：main 还没出来就先等下一轮重试，
+    // 别往 .application-main 里插了又被 React 冲掉
+    if (!document.querySelector('main') && document.readyState !== 'complete') return;
+
     var plan = planMount();
     if (!plan) return;
 
@@ -229,6 +242,8 @@
     observer.observe(plan.host, { childList: true });
 
     applyNativeVisibility();
+    // 原生内容已经藏好、工作台已经插进 DOM，这时候撤遮罩才不会有中间帧
+    revealBoot('工作台已挂载 · ' + plan.mode);
     loadAll({ force: false });
   }
 
@@ -268,10 +283,12 @@
 
         if (!settings.enabled) {
           unmount();
+          revealBoot('总开关已关闭');
           return;
         }
         if (!isHome()) {
           unmount();
+          revealBoot('不是首页');
           return;
         }
         if (state.mounted && (!state.root || !state.root.isConnected)) {
@@ -285,6 +302,15 @@
           return;
         }
         mount();
+        if (state.mounted) {
+          mountTries = 0;
+          return;
+        }
+        if (mountTries++ < 20) {
+          setTimeout(ensure, 150);
+        } else {
+          revealBoot('挂载条件一直不满足');
+        }
       })
       .finally(function () {
         running = false;
@@ -296,7 +322,10 @@
   function tick() {
     if (location.href === lastHref) return;
     lastHref = location.href;
+    mountTries = 0;
     if (state.mounted) unmount();
+    // 兜底 Turbo 没触发的事件：只要是往首页走，先把遮罩盖回去
+    if (GHW.boot && GHW.boot.isHome()) GHW.boot.veil();
     // 等 GitHub 把新页面渲染完
     setTimeout(ensure, 120);
   }
@@ -347,6 +376,7 @@
         state.settings = s;
         if (!s.enabled) {
           unmount();
+          revealBoot();
           return;
         }
         if (needRemount) {

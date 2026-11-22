@@ -1,0 +1,79 @@
+/* boot.css — 首帧遮罩，由 boot.js 在 document_start 加 .ghw-booting 触发。
+ *
+ * 这里必须是一个独立的 content script 入口（run_at: document_start），
+ * 才能赶在 GitHub 画出第一帧之前生效。styles.css 是 document_end 注入的，
+ * 放到那边就晚了。
+ *
+ * 遮罩是不透明的整屏背景 + 一个小 spinner：与其让用户先看半秒原生首页，
+ * 不如先看到「工作台正在启动」。index.js 挂载完成（或任何放弃接管的路径）
+ * 会移除类名，遮罩随之消失。
+ */
+
+/* body 还解析出来之前的首帧也得上色，不然暗色下会先白一下 */
+html.ghw-booting {
+  background-color: #ffffff !important;
+}
+
+html[data-color-mode='dark'].ghw-booting {
+  background-color: #0d1117 !important;
+}
+
+html.ghw-booting > body::before {
+  content: '' !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  background: #ffffff !important;
+}
+
+html.ghw-booting > body::after {
+  content: '' !important;
+  position: fixed !important;
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 2147483001 !important;
+  width: 22px !important;
+  height: 22px !important;
+  margin: -11px 0 0 -11px !important;
+  border: 2px solid rgba(31, 35, 40, 0.12) !important;
+  border-top-color: rgba(31, 35, 40, 0.55) !important;
+  border-radius: 50% !important;
+  animation: ghw-boot-spin 0.7s linear infinite !important;
+}
+
+/* 跟着 GitHub 的 color mode 和系统主题走，别在暗色下闪白 */
+html[data-color-mode='dark'].ghw-booting > body::before {
+  background: #0d1117 !important;
+}
+
+html[data-color-mode='dark'].ghw-booting > body::after {
+  border-color: rgba(240, 246, 252, 0.12) !important;
+  border-top-color: rgba(240, 246, 252, 0.55) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-color-mode='auto'].ghw-booting {
+    background-color: #0d1117 !important;
+  }
+
+  html[data-color-mode='auto'].ghw-booting > body::before {
+    background: #0d1117 !important;
+  }
+
+  html[data-color-mode='auto'].ghw-booting > body::after {
+    border-color: rgba(240, 246, 252, 0.12) !important;
+    border-top-color: rgba(240, 246, 252, 0.55) !important;
+  }
+}
+
+@keyframes ghw-boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ghw-booting > body::after {
+    animation: none !important;
+  }
+}
