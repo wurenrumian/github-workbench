@@ -390,6 +390,7 @@ GHW.parse = (function () {
       var lang = li.querySelector('span[itemprop="programmingLanguage"]');
       var colorEl = li.querySelector('.repo-language-color');
       var stars = li.querySelector('a[href$="/stargazers"]');
+      var forks = li.querySelector('a[href$="/forks"]');
       var timeEl = li.querySelector('relative-time[datetime], time[datetime]');
       var vis = li.querySelector('.Label');
 
@@ -402,6 +403,8 @@ GHW.parse = (function () {
         language: lang ? U.textOf(lang) : '',
         languageColor: U.colorFromStyle(colorEl && colorEl.getAttribute('style')),
         stars: stars ? U.textOf(stars).replace(/[^\d.,km]/gi, '') : '',
+        forks: forks ? U.textOf(forks).replace(/[^\d.,km]/gi, '') : '',
+        starredAt: null,
         updated: timeEl ? timeEl.getAttribute('datetime') : null,
         visibility: vis ? U.textOf(vis) : ''
       });
@@ -483,6 +486,8 @@ GHW.parse = (function () {
       var lang = li.querySelector('[itemprop="programmingLanguage"]');
       var colorEl = li.querySelector('.repo-language-color');
       var stars = li.querySelector('a[href$="/stargazers"]');
+      var forks = li.querySelector('a[href$="/forks"]');
+      var timeEl = li.querySelector('relative-time[datetime], time[datetime]');
 
       out.push({
         fullName: parts[0] + '/' + parts[1],
@@ -493,6 +498,9 @@ GHW.parse = (function () {
         language: lang ? U.textOf(lang) : '',
         languageColor: U.colorFromStyle(colorEl && colorEl.getAttribute('style')),
         stars: stars ? U.textOf(stars).replace(/[^\d.,km]/gi, '') : '',
+        forks: forks ? U.textOf(forks).replace(/[^\d.,km]/gi, '') : '',
+        // /stars 里的时间戳是「收藏时间」，不是仓库更新时间
+        starredAt: timeEl ? timeEl.getAttribute('datetime') : null,
         updated: null,
         visibility: ''
       });

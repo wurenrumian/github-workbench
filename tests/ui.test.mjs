@@ -163,12 +163,19 @@ console.log('\n[仓库 / 关注的项目]');
     language: 'Go',
     languageColor: '#00ADD8',
     stars: '12',
+    forks: '3',
     updated: '2026-11-01T00:00:00Z',
     visibility: i % 2 ? 'Private' : 'Public'
   }));
   app.apply('repos', { data: repos });
   check('repoCount=4 时只渲染 4 个', () => assert(q('[data-panel="repos"] .ghw-repo').length === 4, `实际 ${q('[data-panel="repos"] .ghw-repo').length}`));
   check('私有仓库有徽章', () => assert(q('[data-panel="repos"] .ghw-badge').length === 2, '私有徽章数量不对'));
+  check('卡片带 star / fork 图标', () => {
+    const card = document.querySelector('[data-panel="repos"] .ghw-repo');
+    const stats = card.querySelectorAll('.ghw-repo-stat');
+    assert(stats.length === 2, `实际 ${stats.length} 个 stat`);
+    assert(card.querySelectorAll('.ghw-repo-stat svg').length === 2, '图标缺失');
+  });
 
   app.apply('starred', { data: repos });
   check('关注的项目受 starredCount 限制', () =>

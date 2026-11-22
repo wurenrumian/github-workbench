@@ -255,6 +255,9 @@ GHW.ui = (function () {
   /* -------------------------------------------------------------- 仓库卡片 */
 
   function repoCard(r) {
+    // 关注的项目用「收藏时间」，自己的仓库用「更新时间」
+    var when = r.starredAt ? U.relTime(r.starredAt) + '收藏' : r.updated ? U.relTime(r.updated) + '更新' : '';
+
     return h(
       'a',
       { class: 'ghw-repo', href: abs(r.href) },
@@ -278,8 +281,23 @@ GHW.ui = (function () {
               h('span', { text: r.language })
             )
           : null,
-        r.stars ? h('span', { class: 'ghw-dim', text: '★ ' + r.stars }) : null,
-        r.updated ? h('span', { class: 'ghw-dim', text: U.relTime(r.updated) + '更新' }) : null
+        r.stars
+          ? h(
+              'span',
+              { class: 'ghw-repo-stat' },
+              GHW.icons.make('star', 'ghw-ico-sm'),
+              h('span', { text: r.stars })
+            )
+          : null,
+        r.forks
+          ? h(
+              'span',
+              { class: 'ghw-repo-stat' },
+              GHW.icons.make('repo-forked', 'ghw-ico-sm'),
+              h('span', { text: r.forks })
+            )
+          : null,
+        when ? h('span', { class: 'ghw-dim', text: when }) : null
       )
     );
   }
