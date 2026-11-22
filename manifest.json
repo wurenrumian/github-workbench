@@ -3,7 +3,7 @@
   "name": "GitHub Workbench",
   "short_name": "GH Workbench",
   "version": "0.1.0",
-  "description": "把 github.com 首页换成真正能干活的个人工作台：贡献日历、指派给我的 issue、待我评审的 PR、未读通知、最近仓库。",
+  "description": "把 github.com 首页换成个人工作台：贡献日历、指派给我的 issue、待评审 PR、关注的项目、最近仓库。零配置、不用 token。",
   "minimum_chrome_version": "110",
   "permissions": ["storage"],
   "host_permissions": ["https://github.com/*"],
