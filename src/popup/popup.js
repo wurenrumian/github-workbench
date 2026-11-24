@@ -9,6 +9,7 @@
 
   var PANELS = [
     ['contributions', '贡献日历'],
+    ['notifications', '通知'],
     ['issues', 'Issues'],
     ['review', '等我评审'],
     ['opened', '我开的 PR'],

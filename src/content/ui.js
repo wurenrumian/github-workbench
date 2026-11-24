@@ -254,6 +254,66 @@ GHW.ui = (function () {
     body.appendChild(frag);
   }
 
+  /* -------------------------------------------------------------- 通知 */
+
+  /** 通知行左侧图标：issue / PR 复用状态图标，讨论 / CI 等用自己的 */
+  function notifIcon(it) {
+    if (it.type === 'pr' || it.type === 'issue') return stateMeta(it);
+    if (it.type === 'discussion') return { name: 'comment-discussion', cls: '' };
+    if (it.type === 'check') return { name: 'check-circle', cls: 'is-done' };
+    return { name: 'bell', cls: '' };
+  }
+
+  function renderNotificationRows(body, items, opts) {
+    body.textContent = '';
+    opts = opts || {};
+
+    if (!items.length) {
+      body.appendChild(emptyState(opts.emptyText || '没有通知', opts.emptyHint));
+      return;
+    }
+
+    var frag = document.createDocumentFragment();
+    items.forEach(function (it) {
+      var meta = notifIcon(it);
+      var when = it.updated ? U.relTime(it.updated) : '';
+
+      frag.appendChild(
+        h(
+          'a',
+          {
+            class: 'ghw-row ghw-notif ' + (it.unread ? 'is-unread' : 'is-read'),
+            href: abs(it.href),
+            title: it.title
+          },
+          h('span', { class: 'ghw-row-icon', 'aria-hidden': 'true' }, GHW.icons.make(meta.name, meta.cls)),
+          h(
+            'span',
+            { class: 'ghw-row-body' },
+            h(
+              'span',
+              { class: 'ghw-row-repo' },
+              h('span', {
+                class: 'ghw-notif-dot' + (it.unread ? ' is-on' : ''),
+                title: it.unread ? '未读' : ''
+              }),
+              h('span', { text: it.repo || '' }),
+              it.number ? h('span', { class: 'ghw-row-number', text: '#' + it.number }) : null
+            ),
+            h('span', { class: 'ghw-row-title-text', text: it.title }),
+            h(
+              'span',
+              { class: 'ghw-row-foot' },
+              it.reasonText ? h('span', { class: 'ghw-reason', text: it.reasonText }) : null,
+              when ? h('span', { class: 'ghw-foot-item', text: when }) : null
+            )
+          )
+        )
+      );
+    });
+    body.appendChild(frag);
+  }
+
   /* -------------------------------------------------------------- 仓库卡片 */
 
   function repoCard(r) {
@@ -857,6 +917,161 @@ GHW.ui = (function () {
       )
     );
 
+    /* --- 通知面板：收件箱 / 已保存 / 已完成，后两个点开才抓 --- */
+
+    var notifState = { active: 'notifications' };
+    var notifTabs = {};
+    var notifTotal = h('span', { class: 'ghw-count is-hidden' });
+    var notifMore = h('a', { class: 'ghw-panel-more', href: abs(LINKS.notifications), text: '全部' });
+
+    var clearArmed = false;
+    var clearBusy = false;
+    var clearTimer = null;
+    var notifClearLabel = h('span', { text: '清空' });
+    var notifClearBtn = h(
+      'button',
+      {
+        class: 'ghw-link-btn is-hidden',
+        type: 'button',
+        title: '把收件箱里的通知全部移到「已完成」（可在 GitHub 找回）',
+        onclick: function () {
+          onClearClick();
+        }
+      },
+      notifClearLabel
+    );
+
+    function disarmClear() {
+      clearArmed = false;
+      if (clearTimer) {
+        clearTimeout(clearTimer);
+        clearTimer = null;
+      }
+      notifClearBtn.classList.remove('is-danger');
+      notifClearLabel.textContent = '清空';
+    }
+
+    function updateClearBtn() {
+      var n = notifTabs.notifications.n || 0;
+      var show = notifState.active === 'notifications' && (clearBusy || n > 0);
+      notifClearBtn.classList.toggle('is-hidden', !show);
+      notifClearBtn.disabled = clearBusy;
+    }
+
+    function onClearClick() {
+      if (clearBusy) return;
+      var n = notifTabs.notifications.n || 0;
+      if (!n) return;
+
+      if (!clearArmed) {
+        clearArmed = true;
+        notifClearBtn.classList.add('is-danger');
+        notifClearLabel.textContent = '确认清空 ' + n + ' 条？';
+        clearTimer = setTimeout(disarmClear, 4000);
+        return;
+      }
+
+      if (clearTimer) {
+        clearTimeout(clearTimer);
+        clearTimer = null;
+      }
+      clearArmed = false;
+      notifClearBtn.classList.remove('is-danger');
+      clearBusy = true;
+      notifClearBtn.disabled = true;
+      notifClearLabel.textContent = '清空中…';
+
+      if (ctx.onClearNotifications) ctx.onClearNotifications();
+      else {
+        clearBusy = false;
+        disarmClear();
+        updateClearBtn();
+      }
+    }
+
+    function updateNotifTotal() {
+      var t = notifTabs[notifState.active];
+      if (!t || t.n == null) {
+        notifTotal.classList.add('is-hidden');
+        return;
+      }
+      // 收件箱显示未读数（这才是需要处理的数量），其它文件夹显示条数
+      var n = notifState.active === 'notifications' ? t.unread : t.n;
+      notifTotal.title = notifState.active === 'notifications' ? '收件箱未读通知' : '当前文件夹条数';
+      notifTotal.textContent = n ? String(n) : '';
+      notifTotal.classList.toggle('is-hidden', !n);
+    }
+
+    function selectNotifTab(key) {
+      notifState.active = key;
+      Object.keys(notifTabs).forEach(function (k) {
+        notifTabs[k].tab.classList.toggle('is-active', k === key);
+        notifTabs[k].pane.classList.toggle('is-active', k === key);
+      });
+      notifMore.setAttribute('href', abs(notifTabs[key].href));
+      if (key !== 'notifications') disarmClear();
+      updateNotifTotal();
+      updateClearBtn();
+
+      var t = notifTabs[key];
+      if (!t.loaded) {
+        t.loaded = true; // 先占位，失败时错误块里还有「重试」
+        if (ctx.onLoadTab) ctx.onLoadTab(key);
+      }
+    }
+
+    function notifTab(key, label, href) {
+      var countEl = h('span', { class: 'ghw-tab-count' });
+      var tab = h(
+        'button',
+        {
+          class: 'ghw-tab' + (key === notifState.active ? ' is-active' : ''),
+          type: 'button',
+          dataset: { tab: key },
+          onclick: function () {
+            selectNotifTab(key);
+          }
+        },
+        h('span', { text: label }),
+        countEl
+      );
+      var pane = h(
+        'div',
+        { class: 'ghw-tab-pane' + (key === notifState.active ? ' is-active' : '') },
+        skeletonRows(3)
+      );
+
+      bodyEls[key] = pane;
+      sections[key] = { count: countEl, body: pane, href: href, section: null };
+      notifTabs[key] = { tab: tab, pane: pane, count: countEl, href: href, n: null, unread: 0, loaded: false };
+      return tab;
+    }
+
+    var notificationsPanelEl = h(
+      'section',
+      { class: 'ghw-panel', 'data-panel': 'notifications' },
+      h(
+        'header',
+        { class: 'ghw-panel-head' },
+        h('h2', { class: 'ghw-panel-title' }, h('span', { text: '通知' }), notifTotal),
+        h('div', { class: 'ghw-panel-actions' }, notifClearBtn, notifMore)
+      ),
+      h(
+        'div',
+        { class: 'ghw-tabs' },
+        notifTab('notifications', '收件箱', LINKS.notifications),
+        notifTab('savedNotifications', '已保存', '/notifications?query=is%3Asaved'),
+        notifTab('doneNotifications', '已完成', '/notifications?query=is%3Adone')
+      ),
+      h(
+        'div',
+        { class: 'ghw-panel-body' },
+        Object.keys(notifTabs).map(function (k) {
+          return notifTabs[k].pane;
+        })
+      )
+    );
+
     var mainCol = h(
       'div',
       { class: 'ghw-col ghw-col-main' },
@@ -871,6 +1086,7 @@ GHW.ui = (function () {
     var sideCol = h(
       'div',
       { class: 'ghw-col ghw-col-side' },
+      settings.panels.notifications ? notificationsPanelEl : null,
       settings.panels.issues ? issuesPanelEl : null,
       settings.panels.review ? panel('review', '等我评审', LINKS.review) : null,
       settings.panels.opened ? panel('opened', '我开的 PR', LINKS.pulls) : null
@@ -1050,6 +1266,15 @@ GHW.ui = (function () {
           refreshIssuesTotal();
           return;
         }
+        // 通知的三个文件夹同理
+        if (notifTabs[name]) {
+          notifTabs[name].n = n == null ? null : n;
+          notifTabs[name].count.textContent = n == null ? '' : String(n);
+          notifTabs[name].count.classList.toggle('is-zero', !n);
+          updateNotifTotal();
+          updateClearBtn();
+          return;
+        }
         var s = sections[name];
         if (!s) return;
         if (n == null || n <= 0) {
@@ -1157,6 +1382,28 @@ GHW.ui = (function () {
           return;
         }
 
+        // notifications / savedNotifications / doneNotifications
+        if (notifTabs[name]) {
+          var notifItems = data || [];
+          var tab = notifTabs[name];
+          tab.loaded = true;
+          tab.unread = notifItems.filter(function (x) {
+            return x.unread;
+          }).length;
+          var notifEmpty = {
+            notifications: ['收件箱是空的', 'GitHub 那边也是 All caught up'],
+            savedNotifications: ['没有保存的通知', null],
+            doneNotifications: ['还没有处理完的通知', null]
+          };
+          var emptyInfo = notifEmpty[name] || ['没有通知', null];
+          renderNotificationRows(body, notifItems.slice(0, settings.listLimit), {
+            emptyText: emptyInfo[0],
+            emptyHint: emptyInfo[1]
+          });
+          app.setCount(name, notifItems.length);
+          return;
+        }
+
         // assigned / created / review / opened
         var items = data || [];
         var EMPTY = {
@@ -1171,6 +1418,47 @@ GHW.ui = (function () {
           emptyHint: empty[1]
         });
         app.setCount(name, items.length);
+      },
+
+      /** 「已保存 / 已完成」是按需加载的，刷新时只补已经打开过的 */
+      loadedNotifTabs: function () {
+        return Object.keys(notifTabs).filter(function (k) {
+          return k !== 'notifications' && notifTabs[k].loaded;
+        });
+      },
+
+      /** 清空收件箱成功：列表、计数、已完成缓存一起归位 */
+      notificationsCleared: function (res) {
+        clearBusy = false;
+        disarmClear();
+        var n = (res && res.cleared) || 0;
+        var tab = notifTabs.notifications;
+        tab.n = 0;
+        tab.unread = 0;
+        tab.loaded = true;
+
+        renderNotificationRows(bodyEls.notifications, [], {
+          emptyText: n ? '收件箱已清空' : '收件箱本来就是空的',
+          emptyHint: n ? '已把 ' + n + ' 条移到「已完成」，可以在 GitHub 找回' : null
+        });
+        app.setCount('notifications', 0);
+
+        // 完成列表变了，下次点开重新抓（缓存已经在 API 层清掉）
+        notifTabs.doneNotifications.loaded = false;
+        notifTabs.doneNotifications.n = null;
+        notifTabs.doneNotifications.count.textContent = '';
+        notifTabs.doneNotifications.count.classList.add('is-zero');
+        if (notifState.active === 'doneNotifications') selectNotifTab('doneNotifications');
+
+        updateClearBtn();
+      },
+
+      notificationsClearFailed: function () {
+        clearBusy = false;
+        notifClearBtn.disabled = false;
+        notifClearLabel.textContent = '重试清空';
+        notifClearBtn.classList.remove('is-danger');
+        updateClearBtn();
       },
 
       hasStarred: function (fullName) {

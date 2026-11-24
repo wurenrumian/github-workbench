@@ -333,6 +333,11 @@ html.ghw-native-hidden body footer {
   font-weight: 600;
 }
 
+.ghw-link-btn.is-danger {
+  color: var(--ghw-danger);
+  font-weight: 600;
+}
+
 /* 关注的项目 · 挑选列表 */
 .ghw-picker-wrap {
   display: flex;
@@ -859,6 +864,50 @@ html.ghw-native-hidden body footer {
 .ghw-row.is-read .ghw-row-title {
   font-weight: 400;
   color: var(--ghw-muted);
+}
+
+/* 通知行：未读加粗 + 蓝点，已读整体降一档 */
+.ghw-notif .ghw-row-repo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ghw-notif-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.ghw-notif-dot.is-on {
+  background: var(--ghw-accent);
+}
+
+.ghw-row-number {
+  color: var(--ghw-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ghw-notif.is-read .ghw-row-title-text {
+  font-weight: 400;
+  color: var(--ghw-muted);
+}
+
+.ghw-notif.is-unread .ghw-row-title-text {
+  font-weight: 600;
+}
+
+.ghw-reason {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ghw-border-soft);
+  color: var(--ghw-fg);
+  font-size: 10.5px;
+  line-height: 16px;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------- 仓库卡片 */

@@ -51,6 +51,7 @@ const settings = {
   starredCount: 2,
   panels: {
     contributions: true,
+    notifications: true,
     issues: true,
     review: true,
     opened: true,
@@ -67,6 +68,8 @@ const app = GHW.ui.create({
   settings,
   onRefresh: () => calls.push('refresh'),
   onRetry: (n) => calls.push('retry:' + n),
+  onLoadTab: (n) => calls.push('load:' + n),
+  onClearNotifications: () => calls.push('clear'),
   onSavePicks: (picks) => (calls.picks = picks)
 });
 document.body.appendChild(app.el);
@@ -75,12 +78,12 @@ const q = (sel) => document.querySelectorAll(sel);
 
 console.log('\n[骨架]');
 check('渲染出根容器', () => assert(document.querySelector('#ghw-root-inner'), '没有根节点'));
-check('7 个面板都建好了', () => assert(q('.ghw-panel').length === 7, `实际 ${q('.ghw-panel').length}`));
+check('8 个面板都建好了', () => assert(q('.ghw-panel').length === 8, `实际 ${q('.ghw-panel').length}`));
 check('面板初始都是骨架屏', () => assert(q('.ghw-skel').length > 0, '没有骨架'));
 check('快捷入口有 7 个', () => assert(q('.ghw-quick-link').length === 7, `实际 ${q('.ghw-quick-link').length}`));
 check('Issues 面板有 2 个 tab', () => assert(q('[data-panel="issues"] .ghw-tab').length === 2, 'tab 数量不对'));
 check('默认激活「指派给我」', () =>
-  assert(document.querySelector('.ghw-tab.is-active').dataset.tab === 'assigned', '默认 tab 不对'));
+  assert(document.querySelector('[data-panel="issues"] .ghw-tab.is-active').dataset.tab === 'assigned', '默认 tab 不对'));
 
 console.log('\n[贡献日历]');
 {
@@ -158,13 +161,13 @@ console.log('\n[Issues 双 tab]');
   check('面板头显示总数 3', () =>
     assert(document.querySelector('[data-panel="issues"] .ghw-count').textContent === '3', '总数不对'));
   check('当前只显示 assigned 的内容', () => {
-    assert(document.querySelectorAll('.ghw-tab-pane.is-active .ghw-row').length === 2, '激活 pane 行数不对');
-    assert(document.querySelectorAll('.ghw-tab-pane:not(.is-active) .ghw-row').length === 1, '另一个 pane 行数不对');
+    assert(document.querySelectorAll('[data-panel="issues"] .ghw-tab-pane.is-active .ghw-row').length === 2, '激活 pane 行数不对');
+    assert(document.querySelectorAll('[data-panel="issues"] .ghw-tab-pane:not(.is-active) .ghw-row').length === 1, '另一个 pane 行数不对');
   });
 
   check('点击「我创建的」切换 tab', () => {
     tabs[1].click();
-    const active = document.querySelector('.ghw-tab-pane.is-active');
+    const active = document.querySelector('[data-panel="issues"] .ghw-tab-pane.is-active');
     assert(active.querySelector('.ghw-row-title-text').textContent.includes('我创建的'), '切换后内容不对');
   });
   check('切换后「全部」链接跟着变', () =>
@@ -174,6 +177,152 @@ console.log('\n[Issues 双 tab]');
   check('空列表走空状态', () => {
     app.apply('review', { data: [] });
     assert(document.querySelector('[data-panel="review"] .ghw-empty'), '没有空状态');
+  });
+}
+
+console.log('\n[通知面板]');
+{
+  const panel = document.querySelector('[data-panel="notifications"]');
+  check('有 3 个 tab', () => assert(panel.querySelectorAll('.ghw-tab').length === 3, 'tab 数量不对'));
+  check('默认激活收件箱', () =>
+    assert(panel.querySelector('.ghw-tab.is-active').dataset.tab === 'notifications', '默认 tab 不对'));
+
+  app.apply('notifications', {
+    data: [
+      {
+        type: 'pr',
+        state: 'open',
+        title: '修正时区换算',
+        href: '/a/b/pull/1',
+        repo: 'a/b',
+        repoFullName: 'a/b',
+        number: 1,
+        unread: true,
+        reason: 'review requested',
+        reasonText: '等你评审',
+        updated: '2026-11-22T08:10:00Z'
+      },
+      {
+        type: 'issue',
+        state: 'open',
+        title: '白屏问题',
+        href: '/a/b/issues/2',
+        repo: 'a/b',
+        repoFullName: 'a/b',
+        number: 2,
+        unread: false,
+        reason: 'mention',
+        reasonText: '提到了你',
+        updated: '2026-11-21T09:00:00Z'
+      }
+    ]
+  });
+
+  check('渲染出 2 行', () => assert(panel.querySelectorAll('.ghw-tab-pane.is-active .ghw-row').length === 2, '行数不对'));
+  check('未读行有蓝点，已读没有', () => {
+    const rows = panel.querySelectorAll('.ghw-tab-pane.is-active .ghw-row');
+    assert(rows[0].classList.contains('is-unread'), '未读 class 缺失');
+    assert(rows[0].querySelector('.ghw-notif-dot.is-on'), '未读蓝点缺失');
+    assert(rows[1].classList.contains('is-read'), '已读 class 缺失');
+    assert(!rows[1].querySelector('.ghw-notif-dot.is-on'), '已读不该有蓝点');
+  });
+  check('原因和时间都在页脚', () => {
+    const foot = panel.querySelector('.ghw-row-foot');
+    assert(foot.textContent.includes('等你评审'), foot.textContent);
+    assert(/\d+ 天前/.test(foot.textContent), foot.textContent);
+  });
+  check('面板头显示未读数 1', () =>
+    assert(panel.querySelector('.ghw-count').textContent === '1', '未读计数不对'));
+  check('tab 上显示条数', () => {
+    const tabs = panel.querySelectorAll('.ghw-tab');
+    assert(tabs[0].textContent.includes('2'), tabs[0].textContent);
+  });
+
+  check('点「已保存」按需加载', () => {
+    panel.querySelectorAll('.ghw-tab')[1].click();
+    assert(calls.includes('load:savedNotifications'), calls.join(','));
+  });
+  check('切换后「全部」链接跟着变', () =>
+    assert(/query=is%3Asaved/.test(panel.querySelector('.ghw-panel-more').getAttribute('href')), '链接没跟着切'));
+
+  app.apply('savedNotifications', {
+    data: [
+      {
+        type: 'issue',
+        state: 'closed',
+        title: '保存的 issue',
+        href: '/a/b/issues/3',
+        repo: 'a/b',
+        repoFullName: 'a/b',
+        number: 3,
+        unread: false,
+        reason: 'manual',
+        reasonText: '你订阅了',
+        updated: '2026-11-20T09:00:00Z'
+      }
+    ]
+  });
+  check('已保存 tab 渲染自己的数据', () =>
+    assert(panel.querySelector('.ghw-tab-pane.is-active .ghw-row-title-text').textContent === '保存的 issue', '内容不对'));
+
+  check('回到收件箱后显示「清空」', () => {
+    panel.querySelectorAll('.ghw-tab')[0].click();
+    const btn = panel.querySelector('.ghw-link-btn');
+    assert(btn && !btn.classList.contains('is-hidden'), '清空按钮没显示');
+    assert(btn.textContent === '清空', `按钮文案是 ${btn.textContent}`);
+  });
+  check('第一次点「清空」进入确认，不发请求', () => {
+    const btn = panel.querySelector('.ghw-link-btn');
+    const before = calls.filter((c) => c === 'clear').length;
+    btn.click();
+    assert(/确认清空 2 条/.test(btn.textContent), `按钮文案是 ${btn.textContent}`);
+    assert(btn.classList.contains('is-danger'), '没有危险色');
+    assert(calls.filter((c) => c === 'clear').length === before, '第一次点击不该发请求');
+  });
+  check('第二次点确认才触发清空', () => {
+    panel.querySelector('.ghw-link-btn').click();
+    assert(calls.includes('clear'), calls.join(','));
+  });
+  check('清空成功后列表归零、按钮收起', () => {
+    app.notificationsCleared({ cleared: 2 });
+    const inbox = panel.querySelectorAll('.ghw-tab-pane')[0];
+    assert(inbox.querySelector('.ghw-empty'), '没有空状态');
+    assert(/收件箱已清空/.test(inbox.textContent), inbox.textContent);
+    assert(panel.querySelectorAll('.ghw-tab')[0].textContent.includes('0'), 'tab 计数没归零');
+    assert(panel.querySelector('.ghw-link-btn').classList.contains('is-hidden'), '清空按钮还露着');
+  });
+  check('清空失败后可以重试', () => {
+    app.apply('notifications', {
+      data: [
+        {
+          type: 'issue',
+          state: 'open',
+          title: '失败后重试',
+          href: '/a/b/issues/9',
+          repo: 'a/b',
+          repoFullName: 'a/b',
+          number: 9,
+          unread: true,
+          reason: 'mention',
+          reasonText: '提到了你',
+          updated: '2026-11-20T09:00:00Z'
+        }
+      ]
+    });
+    panel.querySelectorAll('.ghw-tab')[0].click();
+    const btn = panel.querySelector('.ghw-link-btn');
+    btn.click();
+    btn.click();
+    app.notificationsClearFailed(new Error('boom'));
+    assert(btn.textContent === '重试清空', `按钮文案是 ${btn.textContent}`);
+    assert(!btn.disabled, '按钮还禁用着');
+    assert(!btn.classList.contains('is-hidden'), '按钮被藏起来了');
+  });
+
+  check('空收件箱走空状态', () => {
+    app.apply('notifications', { data: [] });
+    const inbox = panel.querySelectorAll('.ghw-tab-pane')[0];
+    assert(inbox.querySelector('.ghw-empty'), '没有空状态');
   });
 }
 
@@ -359,7 +508,7 @@ console.log('\n[关注的项目 · 拖拽排序]');
 console.log('\n[面板顺序]');
 {
   const s2 = JSON.parse(JSON.stringify(settings));
-  s2.layout = { main: ['pinned', 'contributions', 'repos', 'starred'], side: ['opened', 'review', 'issues'] };
+  s2.layout = { main: ['pinned', 'contributions', 'repos', 'starred'], side: ['notifications', 'opened', 'review', 'issues'] };
   const app2 = GHW.ui.create({
     login: 'octocat',
     settings: s2,
@@ -373,14 +522,14 @@ console.log('\n[面板顺序]');
   check('主列按保存的顺序渲染', () =>
     assert(mainOrder.join(',') === 'pinned,contributions,repos,starred', mainOrder.join(',')));
   check('侧列按保存的顺序渲染', () =>
-    assert(sideOrder.join(',') === 'opened,review,issues', sideOrder.join(',')));
+    assert(sideOrder.join(',') === 'notifications,opened,review,issues', sideOrder.join(',')));
   app2.el.remove();
 
   // 跨列拖动：贡献日历被拖到侧列顶部
   const s3 = JSON.parse(JSON.stringify(settings));
   s3.layout = {
     main: ['repos', 'starred', 'pinned'],
-    side: ['contributions', 'issues', 'review', 'opened']
+    side: ['contributions', 'issues', 'review', 'opened', 'notifications']
   };
   const app3 = GHW.ui.create({
     login: 'octocat',
@@ -394,8 +543,8 @@ console.log('\n[面板顺序]');
   const s3o = [...app3.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
   check('跨列顺序正确且没有丢面板', () => {
     assert(m3.join(',') === 'repos,starred,pinned', `main=${m3.join(',')}`);
-    assert(s3o.join(',') === 'contributions,issues,review,opened', `side=${s3o.join(',')}`);
-    assert(m3.length + s3o.length === 7, `总面板数 ${m3.length + s3o.length}`);
+    assert(s3o.join(',') === 'contributions,issues,review,opened,notifications', `side=${s3o.join(',')}`);
+    assert(m3.length + s3o.length === 8, `总面板数 ${m3.length + s3o.length}`);
   });
   app3.el.remove();
 }

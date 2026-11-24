@@ -140,13 +140,45 @@ console.log('\n[通知列表]');
   const doc = parseDoc(window, path.join(fixtures, 'notifications.html'));
   const list = window.GHW.parse.parseNotifications(doc, 20);
 
-  check('解析出 2 条通知', () => assertEqual(list.length, 2, '条数'));
-  check('未读状态正确', () => {
+  check('解析出 3 条通知', () => assertEqual(list.length, 3, '条数'));
+  check('未读状态按 notification-unread 判断', () => {
     assertEqual(list[0].unread, true, '第一条 unread');
     assertEqual(list[1].unread, false, '第二条 unread');
   });
+  check('拆出仓库 / 编号', () => {
+    assertEqual(list[0].repoFullName, 'acme/web', 'repo');
+    assertEqual(list[0].number, 1284, 'number');
+  });
+  check('识别线程类型和状态', () => {
+    assertEqual(list[0].type, 'issue', 'issue type');
+    assertEqual(list[1].type, 'pr', 'pr type');
+    assertEqual(list[1].state, 'merged', 'merged state');
+  });
+  check('通知原因转成中文', () => {
+    assertEqual(list[0].reason, 'mention', 'reason');
+    assertEqual(list[0].reasonText, '提到了你', 'reasonText');
+    assertEqual(list[2].reasonText, '等你评审', 'reasonText');
+  });
+  check('去掉回跳参数和事件锚点', () => {
+    assertEqual(list[0].href, 'https://github.com/acme/web/issues/1284', 'href');
+    assertEqual(list[2].href, '/acme/sdk/pull/45', 'href');
+    assert(!/[?#]/.test(list[1].href), '还留着 query/hash');
+  });
   check('链接补全成绝对地址', () =>
     assert(list.every((n) => n.url.startsWith('https://github.com/')), '有相对链接'));
+  check('时间取 relative-time 的 datetime', () =>
+    assertEqual(list[0].updated, '2026-11-21T09:00:00Z', 'updated'));
+  check('limit 生效', () => assertEqual(window.GHW.parse.parseNotifications(doc, 1).length, 1, 'limit'));
+
+  const bulk = window.GHW.parse.parseNotificationBulk(doc);
+  check('拿到归档表单和 token', () => {
+    assertEqual(bulk.archive.action, '/notifications/beta/archive', 'archive action');
+    assertEqual(bulk.archive.token, 'token-archive', 'archive token');
+  });
+  check('拿到批量已读表单', () => {
+    assertEqual(bulk.markRead.action, '/notifications/beta/mark', 'mark action');
+    assertEqual(bulk.markRead.token, 'token-mark', 'mark token');
+  });
 }
 
 console.log('\n[未读角标]');

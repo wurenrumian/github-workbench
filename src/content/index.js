@@ -59,6 +59,7 @@
     var p = state.settings.panels;
     var list = ['profile'];
     if (p.contributions) list.unshift('contributions');
+    if (p.notifications) list.push('notifications');
     if (p.repos) list.push('repos');
     if (p.starred) list.push('starred');
     if (p.issues) list.push('assigned', 'created');
@@ -201,10 +202,36 @@
       settings: state.settings,
       onRefresh: function () {
         loadAll({ force: true });
+        // 「已保存 / 已完成」是按需加载的，刷新时只补已经打开过的 tab
+        if (state.app) {
+          state.app.loadedNotifTabs().forEach(function (name) {
+            loadOne(name, true);
+          });
+        }
       },
       onRetry: function (name) {
         if (state.app) state.app.setBusy(name);
         loadOne(name, true);
+      },
+      onLoadTab: function (name) {
+        if (state.app) state.app.setBusy(name);
+        loadOne(name, false);
+      },
+      onClearNotifications: function () {
+        API.clearNotifications().then(
+          function (res) {
+            if (!state.mounted || !state.app) return;
+            state.app.notificationsCleared(res);
+            state.app.setFooter(
+              res.cleared ? '已清空 ' + res.cleared + ' 条通知 · 可在「已完成」找回' : '收件箱本来就是空的'
+            );
+          },
+          function (err) {
+            if (!state.mounted || !state.app) return;
+            state.app.notificationsClearFailed(err);
+            state.app.setFooter('清空通知失败：' + ((err && err.message) || '未知错误'), true);
+          }
+        );
       },
       onSavePicks: function (picks) {
         STORE.saveSettings({ starredPicks: picks }).then(function (s) {

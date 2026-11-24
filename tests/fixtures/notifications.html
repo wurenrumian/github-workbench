@@ -6,18 +6,113 @@
   </head>
   <body>
     <main>
-      <ul class="notifications-list">
-        <li id="notification_1001" class="notifications-list-item unread">
-          <a class="markdown-title" href="/facebook/react/issues/12345">Fix the thing</a>
-          <span class="notification-list-item-repo">facebook/react</span>
-          <relative-time datetime="2026-11-22T01:10:00Z">2 hours ago</relative-time>
-        </li>
-        <li id="notification_1002" class="notifications-list-item">
-          <a class="markdown-title" href="/vercel/next.js/pull/999">Improve the build cache</a>
-          <span class="notification-list-item-repo">vercel/next.js</span>
-          <relative-time datetime="2026-11-21T08:30:00Z">yesterday</relative-time>
-        </li>
-      </ul>
+      <div class="js-notifications-container" data-url="/notifications">
+        <ul class="list-style-none">
+          <li
+            class="notifications-list-item p-0 pl-2 pb-2 notification-unread js-notifications-list-item"
+            data-notification-id="NT_unread_issue"
+          >
+            <a
+              class="d-flex notification-list-item-link"
+              href="https://github.com/acme/web/issues/1284?notification_referrer_id=NT_unread_issue&amp;notifications_query=is%3Aunread#event-1"
+            >
+              <div class="flex-shrink-0">
+                <svg class="octicon octicon-issue-opened color-fg-success" viewBox="0 0 16 16" width="16" height="16"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"></path></svg>
+              </div>
+              <div class="d-flex flex-column flex-auto">
+                <div class="d-flex">
+                  <p class="m-0 f6 flex-auto">
+                    acme/web
+                    <span class="text-normal color-fg-muted">#1284</span>
+                  </p>
+                  <p class="note m-0">
+                    <relative-time datetime="2026-11-21T09:00:00Z">Nov 21, 2026</relative-time>
+                  </p>
+                </div>
+                <p class="m-0 text-normal markdown-title">
+                  虚拟列表滚动到底部时偶发白屏
+                </p>
+              </div>
+            </a>
+            <div class="d-flex flex-row flex-md-row-reverse">
+              <span class="f6 flex-self-center ml-2 pl-2">mention</span>
+            </div>
+          </li>
+
+          <li
+            class="notifications-list-item p-0 pl-2 pb-2 notification-read js-notifications-list-item"
+            data-notification-id="NT_merged_pr"
+          >
+            <a
+              class="d-flex notification-list-item-link"
+              href="/godwit-email/godwit/pull/824?notification_referrer_id=NT_merged_pr&amp;notifications_query=is%3Ainbox#event-9"
+            >
+              <div class="flex-shrink-0">
+                <svg class="octicon octicon-git-merge color-fg-done" viewBox="0 0 16 16" width="16" height="16"><path d="M5.45 5.154Z"></path></svg>
+              </div>
+              <div class="d-flex flex-column flex-auto">
+                <div class="d-flex">
+                  <p class="m-0 f6 flex-auto">
+                    godwit-email/godwit
+                    <span class="text-normal color-fg-muted">#824</span>
+                  </p>
+                  <p class="note m-0">
+                    <relative-time datetime="2026-11-23T16:18:30Z">Nov 24, 2026</relative-time>
+                  </p>
+                </div>
+                <p class="m-0 text-normal markdown-title">
+                  feat(app): mark the view's mail read from the list's own space
+                </p>
+              </div>
+            </a>
+            <div class="d-flex flex-row flex-md-row-reverse">
+              <span class="f6 flex-self-center ml-2 pl-2">author</span>
+            </div>
+            <ul class="notification-list-item-actions">
+              <li class="js-notification-action notification-action-mark-archived">
+                <span class="d-flex">Done</span>
+              </li>
+            </ul>
+          </li>
+
+          <li
+            class="notifications-list-item p-0 pl-2 pb-2 notification-unread js-notifications-list-item"
+            data-notification-id="NT_review_pr"
+          >
+            <a
+              class="d-flex notification-list-item-link"
+              href="/acme/sdk/pull/45?notification_referrer_id=NT_review_pr&amp;notifications_query=is%3Aunread"
+            >
+              <div class="flex-shrink-0">
+                <svg class="octicon octicon-git-pull-request color-fg-open" viewBox="0 0 16 16" width="16" height="16"><path d="M1.5 3.25Z"></path></svg>
+              </div>
+              <div class="d-flex flex-column flex-auto">
+                <div class="d-flex">
+                  <p class="m-0 f6 flex-auto">
+                    acme/sdk
+                    <span class="text-normal color-fg-muted">#45</span>
+                  </p>
+                  <p class="note m-0">
+                    <relative-time datetime="2026-11-19T11:00:00Z">Nov 19, 2026</relative-time>
+                  </p>
+                </div>
+                <p class="m-0 text-normal markdown-title">
+                  Add retry with jitter to the HTTP client
+                </p>
+              </div>
+            </a>
+            <div class="d-flex flex-row flex-md-row-reverse">
+              <span class="f6 flex-self-center ml-2 pl-2">review requested</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <form action="/notifications/beta/archive" method="post" data-status="archived">
+        <input type="hidden" name="authenticity_token" value="token-archive" />
+      </form>
+      <form action="/notifications/beta/mark" method="post" data-status="read">
+        <input type="hidden" name="authenticity_token" value="token-mark" />
+      </form>
     </main>
   </body>
 </html>

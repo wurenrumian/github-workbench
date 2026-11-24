@@ -69,6 +69,54 @@ GHW.api = (function () {
     return '/search?q=' + query + '&type=' + type + '&s=updated&o=desc';
   }
 
+  /**
+   * 提交通知页的批量操作表单。GitHub 对这类 POST 返回 200 + 空 body，
+   * 不跟随跳转也不回 JSON，所以成功只看状态码。
+   */
+  function postForm(path, token, ids) {
+    var body = new URLSearchParams();
+    body.set('authenticity_token', token);
+    (ids || []).forEach(function (id) {
+      body.append('notification_ids[]', id);
+    });
+
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 20000) : null;
+
+    return fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        Accept: 'text/html'
+      },
+      cache: 'no-store',
+      body: body.toString(),
+      signal: controller ? controller.signal : undefined
+    })
+      .then(function (res) {
+        if (res.redirected && /\/login/.test(res.url)) {
+          var err = new Error('未登录，或这次请求被 GitHub 拦到了登录页');
+          err.code = 'NOT_LOGGED_IN';
+          throw err;
+        }
+        if (!res.ok) {
+          var e = new Error('HTTP ' + res.status + ' · ' + path);
+          e.code = 'HTTP_' + res.status;
+          throw e;
+        }
+        return res.text();
+      })
+      .then(function (text) {
+        if (timer) clearTimeout(timer);
+        return text;
+      })
+      .catch(function (err) {
+        if (timer) clearTimeout(timer);
+        throw err;
+      });
+  }
+
   var SOURCES = {
     contributions: function (login) {
       return fetchHtml('/users/' + encodeURIComponent(login) + '/contributions').then(function (doc) {
@@ -121,12 +169,69 @@ GHW.api = (function () {
       });
     },
 
+    /**
+     * 通知：/notifications 仍然是服务端渲染的列表（2026-11 实测）。
+     * 三个文件夹对应三个 URL，各自独立缓存、按需加载：
+     *   收件箱 /notifications
+     *   已保存 ?query=is:saved
+     *   已完成 ?query=is:done
+     */
+    notifications: function () {
+      return fetchHtml('/notifications').then(function (doc) {
+        return P.parseNotifications(doc, 60);
+      });
+    },
+
+    savedNotifications: function () {
+      return fetchHtml('/notifications?query=is%3Asaved').then(function (doc) {
+        return P.parseNotifications(doc, 60);
+      });
+    },
+
+    doneNotifications: function () {
+      return fetchHtml('/notifications?query=is%3Adone').then(function (doc) {
+        return P.parseNotifications(doc, 60);
+      });
+    },
+
     repos: function (login) {
       return fetchHtml('/' + encodeURIComponent(login) + '?tab=repositories&sort=updated').then(function (doc) {
         return P.parseRepoList(doc, 20);
       });
     }
   };
+
+  /**
+   * 清空收件箱：把当前收件箱里的通知全部标为 Done（移到「已完成」）。
+   *
+   * 这不是删除——GitHub 的完成/归档可以在 /notifications?query=is:done 找回。
+   * 刻意只处理这次页面里拿到的 ID（最多 60 条），不做「全部历史」，
+   * 避免一次请求动到看不见的数据。
+   */
+  function clearNotifications() {
+    return fetchHtml('/notifications').then(function (doc) {
+      var items = P.parseNotifications(doc, 60);
+      var bulk = P.parseNotificationBulk(doc);
+      var ids = items
+        .map(function (it) {
+          return it.id;
+        })
+        .filter(Boolean);
+
+      if (!ids.length) return { cleared: 0 };
+      if (!bulk.archive || !bulk.archive.token) {
+        var err = new Error('没拿到 GitHub 的归档表单，可能是页面结构变了');
+        err.code = 'NO_FORM';
+        throw err;
+      }
+
+      return postForm(bulk.archive.action, bulk.archive.token, ids).then(function () {
+        return Promise.all([STORE.cacheClear('notifications'), STORE.cacheClear('doneNotifications')]).then(function () {
+          return { cleared: ids.length };
+        });
+      });
+    });
+  }
 
   /**
    * 取一个数据源。有新鲜缓存就直接用，过期则回源，失败时退回过期缓存。
@@ -249,6 +354,7 @@ GHW.api = (function () {
     getLogin: getLogin,
     load: load,
     repoMeta: repoMeta,
+    clearNotifications: clearNotifications,
     sources: Object.keys(SOURCES)
   };
 })();

@@ -17,6 +17,8 @@
 - Issue / PR 面板走 `/search`，打开 `/search?q=is%3Aissue+assignee%3A%40me&type=issues`，看页面上有没有结果。
 - 贡献日历打开 `/users/<你的登录名>/contributions`。
 - 最近更新打开 `/<登录名>?tab=repositories&sort=updated`。
+- 通知：收件箱空就是真的空（GitHub 会显示 All caught up）；「已保存 / 已完成」点开对应 tab 才会发请求。
+- 「清空」失败：一般是登录态或 CSRF token 过期，刷新首页再试；清空只是把通知移到「已完成」，不会删除。
 
 页面本身有内容、扩展里却是空的，通常是解析选择器过期了，见 [数据从哪来](./data-sources.md) 和 README 的「当 GitHub 又改版了」。
 

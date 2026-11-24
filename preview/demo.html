@@ -310,6 +310,7 @@
           starredCount: 4,
           panels: {
             contributions: true,
+            notifications: true,
             issues: true,
             review: true,
             opened: true,
@@ -324,6 +325,20 @@
           settings: settings,
           onRefresh: function () {},
           onRetry: function () {},
+          onClearNotifications: function () {
+            app.notificationsCleared({ cleared: 3 });
+          },
+          onLoadTab: function (name) {
+            if (name === 'savedNotifications') {
+              app.apply('savedNotifications', { data: [] });
+            } else if (name === 'doneNotifications') {
+              app.apply('doneNotifications', {
+                data: [
+                  { type: 'pr', state: 'merged', title: 'feat(app): mark the view mail read from the list own space', href: '/godwit-email/godwit/pull/824', repo: 'godwit-email/godwit', repoFullName: 'godwit-email/godwit', number: 824, unread: false, reason: 'author', reasonText: '你创建的', updated: '2026-11-23T16:18:30Z' }
+                ]
+              });
+            }
+          },
           onToggleNative: function () {}
         });
         document.getElementById('ghw-root').appendChild(app.el);
@@ -339,6 +354,14 @@
         });
 
         app.apply('contributions', { data: contributions, fromCache: true, at: Date.now() });
+
+        app.apply('notifications', {
+          data: [
+            { type: 'pr', state: 'open', title: 'fix: 修正时区换算在夏令时里的边界', href: '/acme/web/pull/1202', repo: 'acme/web', repoFullName: 'acme/web', number: 1202, unread: true, reason: 'review requested', reasonText: '等你评审', updated: '2026-11-22T08:10:00Z' },
+            { type: 'issue', state: 'open', title: '虚拟列表滚动到底部时偶发白屏', href: '/acme/web/issues/1284', repo: 'acme/web', repoFullName: 'acme/web', number: 1284, unread: true, reason: 'mention', reasonText: '提到了你', updated: '2026-11-21T09:00:00Z' },
+            { type: 'pr', state: 'merged', title: 'feat(app): 列表里的邮件可以直接标为已读', href: '/godwit-email/godwit/pull/824', repo: 'godwit-email/godwit', repoFullName: 'godwit-email/godwit', number: 824, unread: false, reason: 'author', reasonText: '你创建的', updated: '2026-11-23T16:18:30Z' }
+          ]
+        });
 
         app.apply('assigned', {
           data: [

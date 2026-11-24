@@ -474,45 +474,156 @@ GHW.parse = (function () {
     return limit ? out.slice(0, limit) : out;
   }
 
-  /** 通知列表（/notifications） */
+  /**
+   * 通知列表（/notifications、?query=is:saved、?query=is:done）。
+   *
+   * 2026-11 实测：通知页仍然是服务端渲染的老式 Rails 列表（不是 React 空壳），
+   * 每行是 li.notifications-list-item，结构：
+   *   li.notification-unread / notification-read / notification-archived
+   *     a.notification-list-item-link[href="/owner/repo/pull/123?notification_referrer_id=..."]
+   *     svg.octicon-git-merge（线程类型 / 状态）
+   *     p.f6 "owner/repo #123"
+   *     p.markdown-title 标题
+   *     relative-time[datetime]
+   *     span.f6.flex-self-center 通知原因（author / mention / review requested …）
+   *
+   * 链接上挂着 notification_referrer_id、notifications_query 和事件锚点，全部去掉，
+   * 否则点进工作台后再回首页会多出一堆参数。
+   */
+  var NOTIF_KIND = {
+    'git-merge': ['pr', 'merged'],
+    'git-pull-request-closed': ['pr', 'closed'],
+    'git-pull-request-draft': ['pr', 'draft'],
+    'git-pull-request': ['pr', 'open'],
+    'issue-closed': ['issue', 'closed'],
+    'issue-opened': ['issue', 'open'],
+    'issue-reopened': ['issue', 'open'],
+    'comment-discussion': ['discussion', ''],
+    'check-circle': ['check', ''],
+    check: ['check', ''],
+    release: ['release', ''],
+    tag: ['release', '']
+  };
+
+  var NOTIF_REASONS = {
+    assign: '指派给你',
+    author: '你创建的',
+    'ci activity': 'CI 动态',
+    ci_activity: 'CI 动态',
+    comment: '新评论',
+    invitation: '邀请',
+    manual: '你订阅了',
+    mention: '提到了你',
+    'review requested': '等你评审',
+    review_requested: '等你评审',
+    'security alert': '安全警报',
+    security_alert: '安全警报',
+    'state change': '状态变化',
+    state_change: '状态变化',
+    subscribed: '你关注了',
+    'team mention': '提到了你的团队',
+    team_mention: '提到了你的团队'
+  };
+
   function parseNotifications(doc, limit) {
     var out = [];
-    var rows = doc.querySelectorAll('li[id^="notification_"], .notifications-list-item, [data-notification-id]');
+    var rows = doc.querySelectorAll('li.notifications-list-item, li[data-notification-id]');
+    var reasons = Object.keys(NOTIF_REASONS);
 
     for (var i = 0; i < rows.length; i++) {
       var li = rows[i];
-      var link = li.querySelector('.markdown-title, a[href]');
+      var link =
+        li.querySelector('a.notification-list-item-link') ||
+        li.querySelector('a[href*="/issues/"], a[href*="/pull/"], a[href*="/discussions/"]');
       if (!link) continue;
-      var href = link.getAttribute('href') || '';
-      if (!href || href === '#') continue;
 
-      var title = U.textOf(link);
+      var rawHref = link.getAttribute('href') || '';
+      if (!rawHref || rawHref.charAt(0) === '#') continue;
+      // 去掉 notification_referrer_id / notifications_query / #event-… 这类回跳参数
+      var href = rawHref.split('#')[0].split('?')[0];
+
+      var titleEl = li.querySelector('.markdown-title');
+      var title = titleEl ? U.textOf(titleEl) : '';
       if (!title) continue;
 
+      // 仓库和编号在同一行： "godwit-email/godwit  #824"
+      var repoLine = U.textOf(li.querySelector('p.f6') || li.querySelector('[class*="flex-auto"]'));
+      var repoMatch = /([A-Za-z0-9._-]+\/[A-Za-z0-9._-]+)/.exec(repoLine);
+      var numMatch = /#(\d+)/.exec(repoLine);
+      var repoFullName = repoMatch ? repoMatch[1] : '';
+      var parts = repoFullName ? repoFullName.split('/') : [];
+
+      // 线程类型 / 状态：行首那个 octicon
+      var iconEl = link.querySelector('svg[class*="octicon-"]');
+      var iconCls = (iconEl && iconEl.getAttribute('class')) || '';
+      var iconMatch = /octicon-([a-z0-9-]+)/.exec(iconCls);
+      var icon = iconMatch ? iconMatch[1] : '';
+      var kind = NOTIF_KIND[icon] || ['other', ''];
+
+      // 原因：右侧那个纯文本 span，值域很小，按白名单匹配，避免把标题误当原因
+      var reason = '';
+      var spans = li.querySelectorAll('span');
+      for (var j = 0; j < spans.length; j++) {
+        var t = U.textOf(spans[j]).toLowerCase();
+        if (t && reasons.indexOf(t) >= 0) {
+          reason = t;
+          break;
+        }
+      }
+
       var timeEl = li.querySelector('relative-time[datetime], time[datetime]');
-      var reason = li.querySelector('.notification-list-item-reason, [data-reason]');
-      var repoEl = li.querySelector('.notification-list-item-repo, .f6 .Link--primary');
 
       out.push({
+        id: li.getAttribute('data-notification-id') || '',
         title: title,
         href: href,
         url: href.indexOf('http') === 0 ? href : 'https://github.com' + href,
-        unread: /\bunread\b/.test(li.className || '') || li.getAttribute('data-read') === 'false',
-        reason: reason ? U.textOf(reason) : '',
-        repo: repoEl ? U.textOf(repoEl) : '',
+        repo: repoFullName,
+        repoFullName: repoFullName,
+        owner: parts[0] || '',
+        name: parts[1] || '',
+        number: numMatch ? parseInt(numMatch[1], 10) : null,
+        icon: icon,
+        type: kind[0],
+        state: kind[1],
+        unread: /\bnotification-unread\b/.test(li.className || '') || /\bunread\b/.test(li.className || ''),
+        reason: reason,
+        reasonText: NOTIF_REASONS[reason] || reason,
         updated: timeEl ? timeEl.getAttribute('datetime') : null
       });
     }
 
-    if (!out.length) {
-      // 兜底：从通知页里所有 issue/PR 链接反推
-      var fallback = parseIssueList(doc, limit);
-      out = fallback.map(function (it) {
-        return { title: it.title, href: it.href, url: it.url, unread: true, reason: '', repo: it.repoFullName, updated: it.updated };
-      });
+    return limit ? out.slice(0, limit) : out;
+  }
+
+  /**
+   * 通知页上的批量操作表单。
+   *
+   * 列表里的「Done」按钮提交到 /notifications/beta/archive；
+   * 「Mark as read」是 /notifications/beta/mark + mark_all。
+   * Rails 的 authenticity_token 是会话级的，从任一表单拿一个就能复用。
+   */
+  function parseNotificationBulk(doc) {
+    var out = { token: '', archive: null, markRead: null };
+    var forms = doc.querySelectorAll('form[action*="/notifications/beta/"]');
+
+    for (var i = 0; i < forms.length; i++) {
+      var form = forms[i];
+      var action = form.getAttribute('action') || '';
+      var tokenEl = form.querySelector('input[name="authenticity_token"]');
+      var token = tokenEl ? tokenEl.value : '';
+      if (!token) continue;
+      if (!out.token) out.token = token;
+
+      if (!out.archive && /\/notifications\/beta\/archive$/.test(action)) {
+        out.archive = { action: action, token: token };
+      }
+      if (!out.markRead && /\/notifications\/beta\/mark$/.test(action)) {
+        out.markRead = { action: action, token: token };
+      }
     }
 
-    return limit ? out.slice(0, limit) : out;
+    return out;
   }
 
   /**
@@ -698,6 +809,7 @@ GHW.parse = (function () {
     parseRepoHeader: parseRepoHeader,
     parseRepoSearch: parseRepoSearch,
     parseNotifications: parseNotifications,
+    parseNotificationBulk: parseNotificationBulk,
     unreadCountFromPage: unreadCountFromPage
   };
 })();

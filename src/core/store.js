@@ -15,7 +15,7 @@ GHW.store = (function () {
 
   var SETTINGS_KEY = 'ghw:settings';
   // 解析结果改结构时升版本号，让旧缓存自动作废
-  var CACHE_PREFIX = 'ghw:cache:v7:';
+  var CACHE_PREFIX = 'ghw:cache:v8:';
 
   var DEFAULTS = {
     // 总开关：开 = 接管内容区，关 = 完全不介入（没有「半接管」这种中间状态）
@@ -36,6 +36,7 @@ GHW.store = (function () {
     layout: { main: [], side: [] },
     panels: {
       contributions: true,
+      notifications: true,
       issues: true,
       review: true,
       opened: true,
@@ -141,6 +142,11 @@ GHW.store = (function () {
     return writeRaw(CACHE_PREFIX + name, { at: Date.now(), data: data });
   }
 
+  /** 只清一个数据源的缓存（清空通知后让下一个 tab 重新抓） */
+  function cacheClear(name) {
+    return removeRaw([CACHE_PREFIX + name]);
+  }
+
   function clearCache() {
     if (hasChrome) {
       return new Promise(function (resolve) {
@@ -169,6 +175,7 @@ GHW.store = (function () {
     saveSettings: saveSettings,
     cacheGet: cacheGet,
     cacheSet: cacheSet,
+    cacheClear: cacheClear,
     clearCache: clearCache
   };
 })();
