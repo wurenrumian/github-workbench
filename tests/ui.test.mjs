@@ -508,7 +508,11 @@ console.log('\n[关注的项目 · 拖拽排序]');
 console.log('\n[面板顺序]');
 {
   const s2 = JSON.parse(JSON.stringify(settings));
-  s2.layout = { main: ['pinned', 'contributions', 'repos', 'starred'], side: ['notifications', 'opened', 'review', 'issues'] };
+  s2.layout = {
+    main: ['pinned', 'contributions'],
+    side: ['notifications', 'opened'],
+    third: ['repos', 'starred', 'review', 'issues']
+  };
   const app2 = GHW.ui.create({
     login: 'octocat',
     settings: s2,
@@ -519,17 +523,21 @@ console.log('\n[面板顺序]');
   document.body.appendChild(app2.el);
   const mainOrder = [...app2.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
   const sideOrder = [...app2.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
+  const thirdOrder = [...app2.el.querySelectorAll('.ghw-col-third > .ghw-panel')].map((p) => p.dataset.panel);
   check('主列按保存的顺序渲染', () =>
-    assert(mainOrder.join(',') === 'pinned,contributions,repos,starred', mainOrder.join(',')));
+    assert(mainOrder.join(',') === 'pinned,contributions', mainOrder.join(',')));
   check('侧列按保存的顺序渲染', () =>
-    assert(sideOrder.join(',') === 'notifications,opened,review,issues', sideOrder.join(',')));
+    assert(sideOrder.join(',') === 'notifications,opened', sideOrder.join(',')));
+  check('第三列按保存的顺序渲染', () =>
+    assert(thirdOrder.join(',') === 'repos,starred,review,issues', thirdOrder.join(',')));
   app2.el.remove();
 
   // 跨列拖动：贡献日历被拖到侧列顶部
   const s3 = JSON.parse(JSON.stringify(settings));
   s3.layout = {
-    main: ['repos', 'starred', 'pinned'],
-    side: ['contributions', 'issues', 'review', 'opened', 'notifications']
+    main: ['repos', 'starred'],
+    side: ['contributions', 'issues', 'review'],
+    third: ['opened', 'notifications', 'pinned']
   };
   const app3 = GHW.ui.create({
     login: 'octocat',
@@ -541,10 +549,12 @@ console.log('\n[面板顺序]');
   document.body.appendChild(app3.el);
   const m3 = [...app3.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
   const s3o = [...app3.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
+  const t3 = [...app3.el.querySelectorAll('.ghw-col-third > .ghw-panel')].map((p) => p.dataset.panel);
   check('跨列顺序正确且没有丢面板', () => {
-    assert(m3.join(',') === 'repos,starred,pinned', `main=${m3.join(',')}`);
-    assert(s3o.join(',') === 'contributions,issues,review,opened,notifications', `side=${s3o.join(',')}`);
-    assert(m3.length + s3o.length === 8, `总面板数 ${m3.length + s3o.length}`);
+    assert(m3.join(',') === 'repos,starred', `main=${m3.join(',')}`);
+    assert(s3o.join(',') === 'contributions,issues,review', `side=${s3o.join(',')}`);
+    assert(t3.join(',') === 'opened,notifications,pinned', `third=${t3.join(',')}`);
+    assert(m3.length + s3o.length + t3.length === 8, `总面板数 ${m3.length + s3o.length + t3.length}`);
   });
   app3.el.remove();
 }

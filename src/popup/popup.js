@@ -102,7 +102,7 @@
   });
 
   els.resetLayout.addEventListener('click', function () {
-    STORE.saveSettings({ layout: { main: [], side: [] } }).then(function () {
+    STORE.saveSettings({ layout: { main: [], side: [], third: [] } }).then(function () {
       flash('布局已重置，刷新 GitHub 首页生效');
     });
   });

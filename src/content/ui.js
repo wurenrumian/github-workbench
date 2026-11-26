@@ -66,10 +66,13 @@ GHW.ui = (function () {
     return out;
   }
 
-  function emptyState(text, hint) {
+  function emptyState(text, hint, iconName) {
     return h(
       'div',
       { class: 'ghw-empty' },
+      iconName
+        ? h('span', { class: 'ghw-empty-ico', 'aria-hidden': 'true' }, GHW.icons.make(iconName))
+        : null,
       h('div', { class: 'ghw-empty-title', text: text }),
       hint ? h('div', { class: 'ghw-empty-hint', text: hint }) : null
     );
@@ -199,7 +202,7 @@ GHW.ui = (function () {
     opts = opts || {};
 
     if (!items.length) {
-      body.appendChild(emptyState(opts.emptyText || '这里空空如也', opts.emptyHint));
+      body.appendChild(emptyState(opts.emptyText || '这里空空如也', opts.emptyHint, opts.emptyIcon));
       return;
     }
 
@@ -269,7 +272,7 @@ GHW.ui = (function () {
     opts = opts || {};
 
     if (!items.length) {
-      body.appendChild(emptyState(opts.emptyText || '没有通知', opts.emptyHint));
+      body.appendChild(emptyState(opts.emptyText || '没有通知', opts.emptyHint, opts.emptyIcon));
       return;
     }
 
@@ -436,7 +439,7 @@ GHW.ui = (function () {
     var refreshBtn = h(
       'button',
       { class: 'ghw-btn', type: 'button', onclick: function () { ctx.onRefresh(); } },
-      h('span', { class: 'ghw-btn-ico', text: '⟳' }),
+      GHW.icons.make('sync', 'ghw-ico-sm'),
       h('span', { text: '刷新' })
     );
 
@@ -506,7 +509,7 @@ GHW.ui = (function () {
 
     var quickLinks = h(
       'nav',
-      { class: 'ghw-quick' },
+      { class: 'ghw-quick', 'aria-label': '工作台快捷入口' },
       [
         ['assigned', '指派给我', LINKS.assigned],
         ['review', '待评审', LINKS.review],
@@ -754,7 +757,7 @@ GHW.ui = (function () {
       }
       var items = pickedStarred();
       if (!items.length) {
-        body.appendChild(emptyState('还没有 star 过项目', '在 GitHub 上 star 之后，这里可以直接挑选显示哪些'));
+        body.appendChild(emptyState('还没有 star 过项目', '在 GitHub 上 star 之后，这里可以直接挑选显示哪些', 'star'));
         return;
       }
       renderRepos(body, items);
@@ -1075,28 +1078,34 @@ GHW.ui = (function () {
     var mainCol = h(
       'div',
       { class: 'ghw-col ghw-col-main' },
-      settings.panels.contributions ? contributionsPanel : null,
-      settings.panels.repos
-        ? panel('repos', '最近更新', '/' + login + '?tab=repositories&sort=updated', '全部仓库')
-        : null,
-      settings.panels.starred ? panel('starred', '关注的项目', LINKS.stars, '全部', starEditAction) : null,
-      settings.panels.pinned ? panel('pinned', '置顶', '/' + login, '个人主页') : null
+      settings.panels.notifications ? notificationsPanelEl : null,
+      settings.panels.starred ? panel('starred', '关注的项目', LINKS.stars, '全部', starEditAction) : null
     );
 
     var sideCol = h(
       'div',
       { class: 'ghw-col ghw-col-side' },
-      settings.panels.notifications ? notificationsPanelEl : null,
       settings.panels.issues ? issuesPanelEl : null,
       settings.panels.review ? panel('review', '等我评审', LINKS.review) : null,
       settings.panels.opened ? panel('opened', '我开的 PR', LINKS.pulls) : null
+    );
+
+    var thirdCol = h(
+      'div',
+      { class: 'ghw-col ghw-col-third' },
+      settings.panels.contributions ? contributionsPanel : null,
+      settings.panels.repos
+        ? panel('repos', '最近更新', '/' + login + '?tab=repositories&sort=updated', '全部仓库')
+        : null,
+      settings.panels.pinned ? panel('pinned', '置顶', '/' + login, '个人主页') : null
     );
 
     /* --- 面板拖动排序 --- */
 
     var cols = [
       { el: mainCol, key: 'main' },
-      { el: sideCol, key: 'side' }
+      { el: sideCol, key: 'side' },
+      { el: thirdCol, key: 'third' }
     ];
 
     function panelsIn(col) {
@@ -1107,6 +1116,9 @@ GHW.ui = (function () {
 
     function applyLayout() {
       var layout = settings.layout || {};
+      // 两列时代的旧布局没有 third：结构变了就直接回到默认分布，
+      // 免得旧数组把所有面板都塞进前两列、第三列空着。
+      if (!Array.isArray(layout.third)) layout = {};
       var all = {};
       cols.forEach(function (c) {
         panelsIn(c.el).forEach(function (p) {
@@ -1139,7 +1151,7 @@ GHW.ui = (function () {
     }
 
     function persistLayout() {
-      var next = { main: [], side: [] };
+      var next = { main: [], side: [], third: [] };
       cols.forEach(function (c) {
         next[c.key] = panelsIn(c.el).map(function (p) {
           return p.dataset.panel;
@@ -1164,7 +1176,7 @@ GHW.ui = (function () {
 
     function wireDrag() {
       panelsIn(mainCol)
-        .concat(panelsIn(sideCol))
+        .concat(panelsIn(sideCol), panelsIn(thirdCol))
         .forEach(function (panel) {
           var head = panel.querySelector('.ghw-panel-head');
           if (!head) return;
@@ -1234,19 +1246,87 @@ GHW.ui = (function () {
       h('a', { class: 'ghw-foot-link', href: abs(LINKS.feed), text: '原生 feed' })
     );
 
-    var el = h(
-      'div',
-      { class: 'ghw-wrap', id: 'ghw-root-inner' },
+    var rail = h(
+      'aside',
+      { class: 'ghw-rail' },
       h(
         'header',
         { class: 'ghw-hero' },
         h('div', { class: 'ghw-hero-id' }, heroAvatar, h('div', { class: 'ghw-hero-text' }, heroName, h('div', { class: 'ghw-hero-sub' }, heroLogin, heroChips), heroBio)),
         h('div', { class: 'ghw-hero-actions' }, metaLine, h('div', { class: 'ghw-hero-btns' }, editProfileBtn, newRepoBtn, copyBtn, refreshBtn))
       ),
-      quickLinks,
-      h('div', { class: 'ghw-grid' }, mainCol, sideCol),
+      quickLinks
+    );
+
+    var el = h(
+      'div',
+      { class: 'ghw-wrap', id: 'ghw-root-inner' },
+      rail,
+      mainCol,
+      sideCol,
+      thirdCol,
       footer
     );
+
+    /* 只有内容真的超过上限时才启用卡片内滚动。
+       否则保持普通文档流，滚轮直接滚动整页，不会出现「先滚卡片、再滚页面」的两段体验。 */
+    var scrollBodies = [];
+    var scrollFrame = 0;
+
+    function isScrollCandidate(body) {
+      if (!body || (!body.classList.contains('ghw-panel-body') && !body.classList.contains('ghw-tab-pane'))) return false;
+      for (var i = 0; i < body.children.length; i++) {
+        var child = body.children[i];
+        if (child.classList.contains('ghw-row') || child.classList.contains('ghw-repo-grid')) return true;
+      }
+      return false;
+    }
+
+    function syncScrollBody(body) {
+      if (!body) return;
+      body.classList.toggle('is-scrollable', isScrollCandidate(body) && body.scrollHeight > body.clientHeight + 1);
+    }
+
+    function syncScrollBodies() {
+      scrollBodies.forEach(syncScrollBody);
+    }
+
+    function queueScrollSync() {
+      if (scrollFrame) return;
+      if (window.requestAnimationFrame) {
+        scrollFrame = window.requestAnimationFrame(function () {
+          scrollFrame = 0;
+          syncScrollBodies();
+        });
+      } else {
+        scrollFrame = setTimeout(function () {
+          scrollFrame = 0;
+          syncScrollBodies();
+        }, 0);
+      }
+    }
+
+    Object.keys(bodyEls).forEach(function (key) {
+      var body = bodyEls[key];
+      if (body && scrollBodies.indexOf(body) < 0) scrollBodies.push(body);
+    });
+
+    if (typeof ResizeObserver !== 'undefined') {
+      var scrollObserver = new ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          syncScrollBody(entry.target);
+        });
+      });
+      scrollBodies.forEach(function (body) {
+        scrollObserver.observe(body);
+      });
+    } else if (typeof MutationObserver !== 'undefined') {
+      var scrollMutationObserver = new MutationObserver(queueScrollSync);
+      scrollMutationObserver.observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+
+    window.addEventListener('resize', queueScrollSync);
+    queueScrollSync();
 
     var app = {
       el: el,
@@ -1313,40 +1393,38 @@ GHW.ui = (function () {
             heroBio.classList.remove('is-hidden');
           }
           heroChips.textContent = '';
-          if (meta.followers) {
-            heroChips.appendChild(
-              h('a', {
-                class: 'ghw-chip ghw-chip-link',
-                href: abs('/' + login + '?tab=followers'),
-                text: meta.followers + ' 关注者'
-              })
+          // 数字 + 标签分开包一层：横版（中等宽度）里读作「16.4k 关注者」，
+          // 左侧竖版资料卡里排成「大数字 / 小标签」的统计格子
+          function statChip(href, value, label) {
+            return h(
+              'a',
+              { class: 'ghw-chip ghw-chip-link ghw-chip--stat', href: abs(href) },
+              h('b', { class: 'ghw-chip-n', text: String(value) }),
+              h('span', { class: 'ghw-chip-k', text: ' ' + label })
             );
+          }
+          if (meta.followers) {
+            heroChips.appendChild(statChip('/' + login + '?tab=followers', meta.followers, '关注者'));
           }
           if (meta.following) {
-            heroChips.appendChild(
-              h('a', {
-                class: 'ghw-chip ghw-chip-link',
-                href: abs('/' + login + '?tab=following'),
-                text: meta.following + ' 正在关注'
-              })
-            );
+            heroChips.appendChild(statChip('/' + login + '?tab=following', meta.following, '正在关注'));
           }
           if (meta.achievements) {
-            heroChips.appendChild(
-              h('a', {
-                class: 'ghw-chip ghw-chip-link',
-                href: abs('/' + login + '?tab=achievements'),
-                text: meta.achievements + ' 项成就'
-              })
-            );
+            heroChips.appendChild(statChip('/' + login + '?tab=achievements', meta.achievements, '项成就'));
           }
-          if (meta.location) heroChips.appendChild(h('span', { class: 'ghw-chip', text: meta.location }));
-          if (meta.company) heroChips.appendChild(h('span', { class: 'ghw-chip', text: '@' + meta.company }));
+          if (meta.location) heroChips.appendChild(h('span', { class: 'ghw-chip ghw-chip--meta', text: meta.location }));
+          if (meta.company) heroChips.appendChild(h('span', { class: 'ghw-chip ghw-chip--meta', text: '@' + meta.company }));
           if (meta.website) {
             var site = meta.website;
             var siteText = site.replace(/^https?:\/\//, '').replace(/\/$/, '');
             heroChips.appendChild(
-              h('a', { class: 'ghw-chip ghw-chip-link', href: site, target: '_blank', rel: 'noreferrer', text: siteText })
+              h('a', {
+                class: 'ghw-chip ghw-chip-link ghw-chip--meta',
+                href: site,
+                target: '_blank',
+                rel: 'noreferrer',
+                text: siteText
+              })
             );
           }
           if (bodyEls.pinned) {
@@ -1398,7 +1476,13 @@ GHW.ui = (function () {
           var emptyInfo = notifEmpty[name] || ['没有通知', null];
           renderNotificationRows(body, notifItems.slice(0, settings.listLimit), {
             emptyText: emptyInfo[0],
-            emptyHint: emptyInfo[1]
+            emptyHint: emptyInfo[1],
+            emptyIcon:
+              name === 'notifications'
+                ? 'bell'
+                : name === 'savedNotifications'
+                  ? 'star'
+                  : 'check-circle'
           });
           app.setCount(name, notifItems.length);
           return;
@@ -1415,7 +1499,8 @@ GHW.ui = (function () {
         var empty = EMPTY[name] || ['暂无', null];
         renderIssueRows(body, items.slice(0, settings.listLimit), {
           emptyText: empty[0],
-          emptyHint: empty[1]
+          emptyHint: empty[1],
+          emptyIcon: name === 'review' || name === 'opened' ? 'git-pull-request' : 'circle-dot'
         });
         app.setCount(name, items.length);
       },
@@ -1439,7 +1524,8 @@ GHW.ui = (function () {
 
         renderNotificationRows(bodyEls.notifications, [], {
           emptyText: n ? '收件箱已清空' : '收件箱本来就是空的',
-          emptyHint: n ? '已把 ' + n + ' 条移到「已完成」，可以在 GitHub 找回' : null
+          emptyHint: n ? '已把 ' + n + ' 条移到「已完成」，可以在 GitHub 找回' : null,
+          emptyIcon: 'check-circle'
         });
         app.setCount('notifications', 0);
 
