@@ -26,7 +26,7 @@
   --ghw-hover: color-mix(in srgb, var(--ghw-accent) 6%, var(--ghw-muted-bg));
   --ghw-focus: color-mix(in srgb, var(--ghw-accent) 30%, transparent);
 
-  /* 贡献格子的五档颜色 */
+  /* 贡献热力图的五档颜色 */
   --ghw-l0: #ebedf0;
   --ghw-l1: #9be9a8;
   --ghw-l2: #40c463;
@@ -119,14 +119,15 @@ html.ghw-native-hidden body footer {
 }
 
 /* 版面：左侧身份区 + 三列面板。
-   容器 ≥1401px 时是「身份区 | 列 1 | 列 2 | 列 3」，
-   中等宽度退成两列面板（身份区横跨整行），窄屏全部堆成一列。
+   宽屏下贡献日历横跨中间两列，最近更新 / 置顶独立占右侧；
+   中等宽度退成两列面板（贡献日历横跨顶部），窄屏全部堆成一列。
    列宽变化只改 CSS，面板归属由 ui.js 的拖动布局决定。 */
 .ghw-wrap {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-areas:
     'rail rail'
+    'feature feature'
     'main side'
     'third third';
   gap: 16px;
@@ -138,6 +139,11 @@ html.ghw-native-hidden body footer {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  min-width: 0;
+}
+
+.ghw-col-feature {
+  grid-area: feature;
   min-width: 0;
 }
 
@@ -185,7 +191,9 @@ html.ghw-native-hidden body footer {
 @container ghw (min-width: 1401px) {
   .ghw-wrap {
     grid-template-columns: 236px repeat(3, minmax(0, 1fr));
-    grid-template-areas: 'rail main side third';
+    grid-template-areas:
+      'rail feature feature third'
+      'rail main side third';
   }
 
   .ghw-rail {
@@ -399,6 +407,7 @@ html.ghw-native-hidden body footer {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
       'rail'
+      'feature'
       'main'
       'side'
       'third';
@@ -1452,6 +1461,11 @@ html.ghw-native-hidden body footer {
   padding-bottom: 6px;
   scrollbar-width: thin;
   scrollbar-color: var(--ghw-border) transparent;
+}
+
+.ghw-heat-frame:focus-visible {
+  outline: 2px solid var(--ghw-accent);
+  outline-offset: 2px;
 }
 
 .ghw-heat-frame::-webkit-scrollbar {

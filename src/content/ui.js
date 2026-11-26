@@ -101,13 +101,11 @@ GHW.ui = (function () {
     var first = new Date(days[0].date + 'T00:00:00');
     var pad = first.getDay(); // 0=周日，网格行也是从周日开始
 
-    // grid-auto-flow: column + 7 行，前面的空格补到第一列即可对齐星期
     var grid = h('div', { class: 'ghw-heat-grid' });
     for (var p = 0; p < pad; p++) {
       grid.appendChild(h('div', { class: 'ghw-heat-cell is-pad' }));
     }
-    for (var i = 0; i < days.length; i++) {
-      var d = days[i];
+    days.forEach(function (d) {
       grid.appendChild(
         h('div', {
           class: 'ghw-heat-cell',
@@ -115,9 +113,8 @@ GHW.ui = (function () {
           title: d.date + ' · ' + (d.count ? d.count + ' 次贡献' : '没有贡献')
         })
       );
-    }
+    });
 
-    // 月份标签：月份第一次出现的那一列
     var monthRow = h('div', { class: 'ghw-heat-months' });
     var lastMonth = null;
     var colCount = Math.ceil((days.length + pad) / 7);
@@ -127,12 +124,11 @@ GHW.ui = (function () {
       var key = days[idx].date.slice(0, 7);
       if (key === lastMonth) continue;
       lastMonth = key;
-      var mm = parseInt(key.slice(5, 7), 10);
       monthRow.appendChild(
         h('span', {
           class: 'ghw-heat-month',
           style: { left: c * 12 + 'px' },
-          text: MONTHS[mm - 1]
+          text: MONTHS[parseInt(key.slice(5, 7), 10) - 1]
         })
       );
     }
@@ -149,15 +145,27 @@ GHW.ui = (function () {
       h('span', { text: '' })
     );
 
+    var heatFrame = h(
+      'div',
+      {
+        class: 'ghw-heat-frame',
+        role: 'img',
+        tabindex: '0',
+        'aria-label': '近一年贡献热力图，颜色越深贡献越多，默认显示最新日期'
+      },
+      weekday,
+      grid
+    );
+
     body.appendChild(
       h(
         'div',
         { class: 'ghw-heat' },
         monthRow,
-        h('div', { class: 'ghw-heat-frame' }, weekday, grid),
+        heatFrame,
         h(
           'div',
-          { class: 'ghw-heat-legend' },
+          { class: 'ghw-heat-legend', 'aria-hidden': 'true' },
           h('span', { text: '少' }),
           h('i', { 'data-level': '0' }),
           h('i', { 'data-level': '1' }),
@@ -168,6 +176,9 @@ GHW.ui = (function () {
         )
       )
     );
+
+    // 窄屏仍有横向溢出时，默认定位到最新一端。
+    heatFrame.scrollLeft = heatFrame.scrollWidth;
 
     var stats = [
       { k: '近一年', v: U.fmtNum(data.total), s: '次贡献' },
@@ -1075,6 +1086,12 @@ GHW.ui = (function () {
       )
     );
 
+    var featureCol = h(
+      'div',
+      { class: 'ghw-col ghw-col-feature' },
+      settings.panels.contributions ? contributionsPanel : null
+    );
+
     var mainCol = h(
       'div',
       { class: 'ghw-col ghw-col-main' },
@@ -1093,7 +1110,6 @@ GHW.ui = (function () {
     var thirdCol = h(
       'div',
       { class: 'ghw-col ghw-col-third' },
-      settings.panels.contributions ? contributionsPanel : null,
       settings.panels.repos
         ? panel('repos', '最近更新', '/' + login + '?tab=repositories&sort=updated', '全部仓库')
         : null,
@@ -1103,6 +1119,7 @@ GHW.ui = (function () {
     /* --- 面板拖动排序 --- */
 
     var cols = [
+      { el: featureCol, key: 'feature' },
       { el: mainCol, key: 'main' },
       { el: sideCol, key: 'side' },
       { el: thirdCol, key: 'third' }
@@ -1116,9 +1133,9 @@ GHW.ui = (function () {
 
     function applyLayout() {
       var layout = settings.layout || {};
-      // 两列时代的旧布局没有 third：结构变了就直接回到默认分布，
-      // 免得旧数组把所有面板都塞进前两列、第三列空着。
-      if (!Array.isArray(layout.third)) layout = {};
+      // 旧布局没有 feature：贡献日历升级为跨两列后直接回默认分布，
+      // 免得旧数组把它塞回窄列，重新出现显示拥挤的问题。
+      if (!Array.isArray(layout.feature)) layout = {};
       var all = {};
       cols.forEach(function (c) {
         panelsIn(c.el).forEach(function (p) {
@@ -1151,7 +1168,7 @@ GHW.ui = (function () {
     }
 
     function persistLayout() {
-      var next = { main: [], side: [], third: [] };
+      var next = { feature: [], main: [], side: [], third: [] };
       cols.forEach(function (c) {
         next[c.key] = panelsIn(c.el).map(function (p) {
           return p.dataset.panel;
@@ -1175,8 +1192,8 @@ GHW.ui = (function () {
     }
 
     function wireDrag() {
-      panelsIn(mainCol)
-        .concat(panelsIn(sideCol), panelsIn(thirdCol))
+      panelsIn(featureCol)
+        .concat(panelsIn(mainCol), panelsIn(sideCol), panelsIn(thirdCol))
         .forEach(function (panel) {
           var head = panel.querySelector('.ghw-panel-head');
           if (!head) return;
@@ -1262,6 +1279,7 @@ GHW.ui = (function () {
       'div',
       { class: 'ghw-wrap', id: 'ghw-root-inner' },
       rail,
+      featureCol,
       mainCol,
       sideCol,
       thirdCol,

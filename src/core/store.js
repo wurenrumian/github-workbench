@@ -32,8 +32,8 @@ GHW.store = (function () {
     starredCount: 6,
     // 手动挑选要显示的关注项目（["owner/name", ...]，空数组 = 用上面那个默认数量）
     starredPicks: [],
-    // 面板顺序（拖动后保存）：{ main: [...], side: [...], third: [...] }
-    layout: { main: [], side: [], third: [] },
+    // 面板顺序（拖动后保存）：feature 为跨两列的贡献日历区
+    layout: { feature: [], main: [], side: [], third: [] },
     panels: {
       contributions: true,
       notifications: true,
@@ -100,15 +100,16 @@ GHW.store = (function () {
     for (var k in saved) {
       if (!Object.prototype.hasOwnProperty.call(saved, k)) continue;
       if (k === 'layout' && saved.layout && typeof saved.layout === 'object') {
-        // 两列时代的布局没有 third 键：结构升级到三列后直接回默认分布，
-        // 否则旧数组会把所有面板都塞进前两列，第三列永远空着。
-        if (!Array.isArray(saved.layout.third)) {
-          out.layout = { main: [], side: [], third: [] };
+        // 旧布局没有 feature 键：贡献日历升级为跨两列后直接回默认分布，
+        // 否则它会被旧数组塞回窄列，重新出现显示拥挤的问题。
+        if (!Array.isArray(saved.layout.feature)) {
+          out.layout = { feature: [], main: [], side: [], third: [] };
         } else {
           out.layout = {
+            feature: saved.layout.feature.slice(),
             main: Array.isArray(saved.layout.main) ? saved.layout.main.slice() : [],
             side: Array.isArray(saved.layout.side) ? saved.layout.side.slice() : [],
-            third: saved.layout.third.slice()
+            third: Array.isArray(saved.layout.third) ? saved.layout.third.slice() : []
           };
         }
       } else if (k === 'panels' && saved.panels && typeof saved.panels === 'object') {

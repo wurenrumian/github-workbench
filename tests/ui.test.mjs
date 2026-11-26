@@ -93,10 +93,18 @@ console.log('\n[贡献日历]');
   );
   const summary = GHW.parse.summarizeContributions(GHW.parse.parseContributions(doc));
   check('apply 不抛异常', () => app.apply('contributions', { data: summary }));
-  check('渲染出 365 个格子', () => assert(q('[data-panel="contributions"] .ghw-heat-cell:not(.is-pad)').length === 365, `实际 ${q('[data-panel="contributions"] .ghw-heat-cell:not(.is-pad)').length}`));
-  check('有 5 个统计块', () => assert(q('.ghw-stat').length === 5, `实际 ${q('.ghw-stat').length}`));
+  check('渲染出 365 个每日贡献格子', () => {
+    assert(q('[data-panel="contributions"] .ghw-heat-cell:not(.is-pad)').length === 365, `实际 ${q('[data-panel="contributions"] .ghw-heat-cell:not(.is-pad)').length}`);
+  });
   check('月份标签不超过 13 个', () => assert(q('.ghw-heat-month').length <= 13, `实际 ${q('.ghw-heat-month').length}`));
-  check('格子上有 title 提示', () => {
+  check('有 5 个统计块', () => assert(q('.ghw-stat').length === 5, `实际 ${q('.ghw-stat').length}`));
+  check('横向热力图有无障碍标签和键盘焦点', () => {
+    const chart = document.querySelector('.ghw-heat-frame');
+    assert(chart.getAttribute('role') === 'img', '缺少 role=img');
+    assert(chart.getAttribute('tabindex') === '0', '滚动区域不能键盘聚焦');
+    assert(/贡献热力图/.test(chart.getAttribute('aria-label') || ''), '缺少无障碍说明');
+  });
+  check('格子上有日期和贡献次数提示', () => {
     const cell = document.querySelector('.ghw-heat-cell[data-level="1"]');
     assert(/次贡献/.test(cell.getAttribute('title')), 'title 缺失');
   });
@@ -509,9 +517,10 @@ console.log('\n[面板顺序]');
 {
   const s2 = JSON.parse(JSON.stringify(settings));
   s2.layout = {
-    main: ['pinned', 'contributions'],
+    feature: ['contributions'],
+    main: ['pinned', 'starred'],
     side: ['notifications', 'opened'],
-    third: ['repos', 'starred', 'review', 'issues']
+    third: ['repos', 'review', 'issues']
   };
   const app2 = GHW.ui.create({
     login: 'octocat',
@@ -521,21 +530,25 @@ console.log('\n[面板顺序]');
     onSavePicks: () => {}
   });
   document.body.appendChild(app2.el);
+  const featureOrder = [...app2.el.querySelectorAll('.ghw-col-feature > .ghw-panel')].map((p) => p.dataset.panel);
   const mainOrder = [...app2.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
   const sideOrder = [...app2.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
   const thirdOrder = [...app2.el.querySelectorAll('.ghw-col-third > .ghw-panel')].map((p) => p.dataset.panel);
+  check('跨两列区按保存的顺序渲染', () =>
+    assert(featureOrder.join(',') === 'contributions', featureOrder.join(',')));
   check('主列按保存的顺序渲染', () =>
-    assert(mainOrder.join(',') === 'pinned,contributions', mainOrder.join(',')));
+    assert(mainOrder.join(',') === 'pinned,starred', mainOrder.join(',')));
   check('侧列按保存的顺序渲染', () =>
     assert(sideOrder.join(',') === 'notifications,opened', sideOrder.join(',')));
   check('第三列按保存的顺序渲染', () =>
-    assert(thirdOrder.join(',') === 'repos,starred,review,issues', thirdOrder.join(',')));
+    assert(thirdOrder.join(',') === 'repos,review,issues', thirdOrder.join(',')));
   app2.el.remove();
 
   // 跨列拖动：贡献日历被拖到侧列顶部
   const s3 = JSON.parse(JSON.stringify(settings));
   s3.layout = {
-    main: ['repos', 'starred'],
+    feature: ['repos'],
+    main: ['starred'],
     side: ['contributions', 'issues', 'review'],
     third: ['opened', 'notifications', 'pinned']
   };
@@ -547,14 +560,16 @@ console.log('\n[面板顺序]');
     onSavePicks: () => {}
   });
   document.body.appendChild(app3.el);
+  const f3 = [...app3.el.querySelectorAll('.ghw-col-feature > .ghw-panel')].map((p) => p.dataset.panel);
   const m3 = [...app3.el.querySelectorAll('.ghw-col-main > .ghw-panel')].map((p) => p.dataset.panel);
   const s3o = [...app3.el.querySelectorAll('.ghw-col-side > .ghw-panel')].map((p) => p.dataset.panel);
   const t3 = [...app3.el.querySelectorAll('.ghw-col-third > .ghw-panel')].map((p) => p.dataset.panel);
   check('跨列顺序正确且没有丢面板', () => {
-    assert(m3.join(',') === 'repos,starred', `main=${m3.join(',')}`);
+    assert(f3.join(',') === 'repos', `feature=${f3.join(',')}`);
+    assert(m3.join(',') === 'starred', `main=${m3.join(',')}`);
     assert(s3o.join(',') === 'contributions,issues,review', `side=${s3o.join(',')}`);
     assert(t3.join(',') === 'opened,notifications,pinned', `third=${t3.join(',')}`);
-    assert(m3.length + s3o.length + t3.length === 8, `总面板数 ${m3.length + s3o.length + t3.length}`);
+    assert(f3.length + m3.length + s3o.length + t3.length === 8, `总面板数 ${f3.length + m3.length + s3o.length + t3.length}`);
   });
   app3.el.remove();
 }
